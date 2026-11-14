@@ -452,6 +452,8 @@ def upload_manifest(pick, meta, cfg, variants, titles, creds=None, job=None, mus
     creds = creds or credits(pick, job, meta)
     fp, when, pred = footage(pick, job, meta), moment_at(pick, job, meta), predicted(pick, cfg)
     moment = moment_signals(pick, job, meta)
+    from .config import code_version
+    version = code_version()
     tags = pick.get("hashtags") or cfg.get("hashtags", [])
     desc = pick.get("description") or titles[0]
     out = []
@@ -467,7 +469,8 @@ def upload_manifest(pick, meta, cfg, variants, titles, creds=None, job=None, mus
                     "campaign": pick.get("campaign"),
                     "source": creds[0][1], "sources": [link for _, link in creds],
                     "duration": v["check"].get("duration"), "footage": fp, "moment_at": when,
-                    "predicted": pred.get(v["hook"]), "moment": moment, "music": list(music_used or [])})
+                    "predicted": pred.get(v["hook"]), "moment": moment, "music": list(music_used or []),
+                    "clipper_version": version})
     return out
 
 

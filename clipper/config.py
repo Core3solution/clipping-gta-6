@@ -12,6 +12,23 @@ DEFAULT_PROFILE = "gta6"
 PROFILE = DEFAULT_PROFILE  # the active profile, set by load()
 
 IS_MAC = sys.platform == "darwin"
+# Flagged IPs get "Sign in to confirm you're not a bot" on the default clients; mweb + a bgutil PO token still works.
+YT_ARGS = ["--extractor-args", "youtube:player-client=default,mweb"]
+
+def code_version():
+    """'<commit> <date>' of this checkout (+ ' modified' with local edits), so an outdated machine shows up in setup
+    output and in every upload.json; 'unknown' outside git."""
+    import subprocess
+    try:
+        head = subprocess.run(["git", "-C", str(ROOT), "log", "-1", "--format=%h %cs"], capture_output=True,
+                              text=True, timeout=10).stdout.strip()
+        dirty = subprocess.run(["git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no", "--", "clipper"],
+                               capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return (head + (" modified" if dirty else "")) if head else "unknown"
+
+
 MODEL_SEARCH = [
     "/opt/homebrew/share/whisper-cpp/ggml-large-v3-turbo-q5_0.bin",
     "~/.cache/whisper/ggml-large-v3-turbo-q5_0.bin",

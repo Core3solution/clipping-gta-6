@@ -20,7 +20,7 @@ from pathlib import Path
 import yaml
 
 from . import config
-from .config import JOBS, ROOT
+from .config import JOBS, ROOT, YT_ARGS
 from .sources import topic_evidence
 
 WORK = JOBS / "_live"  # shared by all profiles: one recorder per stream, one set of analysis slots
@@ -91,7 +91,7 @@ def remove(ref):
 
 def probe(url):
     """{'live': bool, 'title', 'description', 'tags'} for a channel's live URL."""
-    res = subprocess.run(["yt-dlp", "-J", "--no-warnings", "--skip-download", "--no-playlist", url],
+    res = subprocess.run(["yt-dlp", *YT_ARGS, "-J", "--no-warnings", "--skip-download", "--no-playlist", url],
                          capture_output=True, text=True, timeout=90)
     if res.returncode != 0 or not res.stdout.strip():
         return {"live": False}
@@ -348,7 +348,7 @@ def record(name, url, chunk_minutes=30, quality="best[height<=1080]/best", cfg=N
                 continue
         reconnect = False
         misses = 0
-        hls = subprocess.run(["yt-dlp", "-g", "-f", quality, "--no-warnings", url], capture_output=True, text=True)
+        hls = subprocess.run(["yt-dlp", *YT_ARGS, "-g", "-f", quality, "--no-warnings", url], capture_output=True, text=True)
         if hls.returncode != 0:
             time.sleep(5)
             continue

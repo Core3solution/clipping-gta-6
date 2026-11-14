@@ -150,6 +150,26 @@ The 12 biggest streamer-clip outliers in the dataset (12–117x their channel's 
 
 **How to use it on live clips:** for every candidate, name its trigger. If you can't name one, it isn't a clip. Write the hook and title around that trigger: a question for judge clips ("Is xQc's aim legit?!"), a withheld setup for suspense ("Speed had NO idea Kai was *behind* him"), irony for persona fails ("Smartest xQc *heist* ever 💀"), the stakes for streaks ("Can xQc's chat name *5 songs* straight?"). Cut so the premise lands in the first second and the clip ends on the face.
 
+**Strong reactions, not fake controversy (2026-11-14):** a keyword pass on the 3,481 titles (vs the rest of the same set): verdict questions (cheat, legit, fair, wrong, who's right) ~1.28x (36 titles, thin), outrage words (caught, exposed, toxic) ~1.1x (53), emotional words/emoji (😭, wholesome, heartbreak) ~1.07x (126), rage-bait opinions (overrated, worst, trash, ruined, hate) ~0.84x (97). So provoke by handing the viewer a real verdict and by pushing the clip's one true emotion; insults and invented disputes lose.
+
+## Hits vs flops inside the same channel (2026-11-14)
+From the 3,481-Short dataset, the 3 highest-lift and 3 lowest-lift Shorts from each of 19 channels (104 downloaded and measured; data in `hits-vs-flops.json`, no media kept). Same channel = same face, audience and editor, so only the video differs. Frames were measured automatically: cuts and flashes from frame differences, on-screen text and faces with Apple Vision every 3 s. Titles were labelled blind (the hit/flop group hidden) for emotion, arousal, concrete stake and verdict question. "Channels" counts how many channels' hits had more of the feature than their flops. With 17 channels, none of these is statistically conclusive alone; read them as directions.
+
+| Feature | Hits (median) | Flops (median) | Channels where hits > flops | Reading |
+|---|---|---|---|---|
+| Length | 48s | 53s | 5 of 17 (hits shorter in 12) | ≤30s: 15 hits vs 6 flops. Shorter wins |
+| Cuts per 10 s | 3.0 | 4.3 | 5 of 17 (hits cut less in 12) | Fast cutting doesn't help; let the moment play |
+| Flashes per 10 s | 0 | 0.16 | 7 of 8 | No effect. Lime flashes in 3 hits vs 5 flops |
+| Face on screen | 86% of frames | 68% | 11 of 4 | Keep the face visible |
+| Text on screen (after 3 s) | 77% of frames | 70% | 11 of 6 | Captions all the way through |
+| Hook text in the first second | 1 | 1 | 7 of 3 | Nearly all (88 of 104) have it |
+| High-arousal title | 21 of 57 | 18 of 57 | | Barely different |
+| Concrete stake in title | 18 of 57 | 17 of 57 | | Barely different |
+| Curiosity/suspense title | 10 of 57 | 5 of 57 | | Leans hit |
+| Ad or plain-info title | 12 of 57 | 22 of 57 | | Leans flop |
+
+**What it means for our clips:** what the video shows decided more than how the title sounds. The hits show the person's face throughout, run shorter, cut less and caption throughout. A title's emotion or stake barely separated hits from flops *within* a channel, but a curiosity gap did, and so did avoiding ad or info wording. Flashes made no difference, so they stay as accents for a payoff, not a driver. This doesn't contradict Berger & Milkman (2012: high-arousal emotions such as awe, anger and anxiety get shared more; sadness gets shared less): the arousal has to be in the moment itself, which the title points at and the face delivers.
+
 ## Measured: what moves views on 3,481 gaming Shorts (2026-11-09)
 The 28-video sample above only has hits, so it can't show what flops. To fix that, we pulled every recent Short (up to 200 each) from 19 GTA, Call of Duty/Warzone, CoD Zombies, Fortnite and streamer channels: MrBossFTW, DarkViperAU, Typical Gamer, RDCworld1, GTA Series Videos, Kai Cenat Live, xQc (GTA); Swagg, TimTheTatman, NICKMERCS, iFerg, BobbyPoff, WhosImmortal, Westie (CoD/Warzone); MrRoflWaffles, MrDalekJD (Zombies); Ninja, SypherPK, Jynxzi (other games). Each Short's views are compared with the 30 its own channel posted around it, so channel size and growth cancel out. A feature's effect is how many times its channel norm a Short with that feature got, vs the same channels' Shorts without it, with a 90% bootstrap range. We use the GTA estimate where GTA alone is conclusive, otherwise the all-gaming estimate. Data: `gaming-shorts-titles.json` (titles and view counts only; no media kept). `clipper simulate` resamples these Shorts to rank a clip's hooks.
 
