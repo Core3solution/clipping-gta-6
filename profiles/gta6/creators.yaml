@@ -1,4 +1,4 @@
-# Managed by `python3 -m clipper creators`. Every upload is still checked against the profile's topic.
+# Managed by `python3 -m clipper creators`. Every upload is still checked for GTA 6.
 creators:
 - name: GTA Series Videos
   url: https://www.youtube.com/@GTASeriesVideos/videos
@@ -14,7 +14,3 @@ creators:
   url: https://www.youtube.com/@VanossGaming/videos
 - name: Typical Gamer
   url: https://www.youtube.com/@TypicalGamer/videos
-- name: CaseOh
-  url: https://www.youtube.com/@caseoh_/videos
-- name: MoreCaseOh
-  url: https://www.youtube.com/@MoreCaseOh/videos

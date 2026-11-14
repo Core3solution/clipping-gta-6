@@ -3,7 +3,7 @@ import re
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
-from .config import JOBS, YT_ARGS
+from .config import JOBS
 
 
 def _flat(url, limit):
@@ -20,7 +20,7 @@ def _matches(title, keywords):
 
 
 def _full_meta(vid):
-    res = subprocess.run(["yt-dlp", *YT_ARGS, "-j", "--skip-download", "--no-warnings", "--no-playlist",
+    res = subprocess.run(["yt-dlp", "-j", "--skip-download", "--no-warnings", "--no-playlist",
                           f"https://www.youtube.com/watch?v={vid}"], capture_output=True, text=True, timeout=120)
     return json.loads(res.stdout) if res.returncode == 0 and res.stdout.strip() else None
 
@@ -102,7 +102,7 @@ def video_id(video):
         return m.group(1)
     if re.fullmatch(r"[\w-]{11}", video):
         return video
-    res = subprocess.run(["yt-dlp", *YT_ARGS, "--print", "id", "--no-playlist", video],
+    res = subprocess.run(["yt-dlp", "--print", "id", "--no-playlist", video],
                          capture_output=True, text=True, check=True)
     return res.stdout.strip().splitlines()[0]
 
@@ -114,7 +114,7 @@ def fetch(video, section=None):
     job.mkdir(parents=True, exist_ok=True)
     src = job / "source.mp4"
     if not src.exists():
-        cmd = ["yt-dlp", *YT_ARGS, "--no-playlist", "--write-info-json", "--merge-output-format", "mp4",
+        cmd = ["yt-dlp", "--no-playlist", "--write-info-json", "--merge-output-format", "mp4",
                "-f", "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b",
                "-o", str(job / "source.%(ext)s"), url]
         if section:

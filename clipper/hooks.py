@@ -31,20 +31,6 @@ STRUCTURES.append(("premise + twist", CAPS_TWIST, "xQc FORCES Weazel News Ron Ot
 STRUCTURES.append(("superlative", re.compile(r"\b(best|fastest|worst|biggest|craziest|smartest|most|first ever|"
                                            r"world'?s|#1|ever)\b", re.I), "World's Best Sniper in Black Ops 7"))
 # Words that describe the clip instead of teasing it; fine inside a tease ("Wait for his reaction...").
-# A question that hands the viewer a verdict to argue about ("Is He Cheating?!", 7.8M, 29x; ~1.28x on 36 titles).
-DEBATE = re.compile(r"\?.*$|^(is|was|did|does|should|would|who)\b", re.I)
-VERDICT = re.compile(r"\b(legit|fair|cheat\w*|wrong|right|real|fake|better|worse|worth|deserved?|should|scripted|"
-                     r"rigged|lying|overreact\w*|too far|guilty|innocent|who won|who'?s|looks? like|same (guy|person))\b", re.I)
-# A concrete stake: a number or amount, a consequence, or a named character/thing that isn't the streamer. On our
-# channel the top 3 had one ("Trevor", "13", "$500K") and the bottom 4 didn't ("USB", "marlin", "the betrayal").
-STAKE = re.compile(r"\d|\$|\b(one|two|three|four|five|ten|hundred|thousand|million|billion|grand|dead|dies?|died|kill\w*|"
-                   r"shot|shoots?|arrest\w*|banned|fired|rob\w*|crash\w*|hostage|cheat\w*|hack\w*|jail|prison|sued|"
-                   r"broke|quit\w*|kicked|caught|exposed)\b", re.I)
-NOT_A_STAKE = {"GTA", "RP", "VI", "POV", "NPC", "I", "OK", "PD", "NoPixel", "Rockstar"}
-STREAMERS = {"xqc", "kai", "cenat", "caseoh", "speed", "ishowspeed", "jynxzi", "ninja", "timthetatman", "nickmercs",
-             "swagg", "sypherpk", "darkviperau", "chat"}
-# Rage-bait words that measured ~0.84x on 97 gaming Shorts titles: provoke with a verdict, not an insult.
-RAGE_BAIT = re.compile(r"\b(overrated|unpopular opinion|trash|garbage|ruined|sucks|disgusting|nobody asked)\b", re.I)
 SPOILERS = re.compile(r"\b(reaction|compilation|highlights?|recap|full video|part \d+|episode)\b", re.I)
 # Spoken first lines the viral clips opened on (cold opens), vs filler that loses the swipe.
 OPENING_TYPES = [
@@ -100,18 +86,7 @@ def title_topic(cfg):
     return cfg.get("title_topic") or (GTA6_TITLE if is_gta(cfg) else None)
 
 
-def has_stake(hook, names=()):
-    """A number/amount, a consequence word, or a capitalised name (not the hook's first word) other than the streamer."""
-    text = re.sub(r"\bgta ?(\d|vi?)\b", "GTA", plain(hook), flags=re.I)  # the game's number isn't a stake
-    if STAKE.search(text):
-        return True
-    skip = STREAMERS | {n.lower() for n in names}
-    words = re.findall(r"[A-Za-z][A-Za-z0-9']*", text)[1:]
-    return any(w[0].isupper() and w not in NOT_A_STAKE and not w.isupper() and re.sub(r"'s$", "", w).lower() not in skip
-               for w in words)
-
-
-def check_hook(hook, gta=True, names=()):
+def check_hook(hook, gta=True):
     """(fails, notes): fails break a rule every 500k+ hook followed; notes are judgment calls."""
     text = plain(hook)
     words = (re.sub(r"\bgta (6|vi)\b", "GTA6", text, flags=re.I) if gta else text).split()  # "GTA 6" is one word
@@ -128,13 +103,6 @@ def check_hook(hook, gta=True, names=()):
     if found == ["premise + twist"]:
         notes.append("a CAPS word alone measured 0.97x: the premise works when it names the streamer "
                      "(\"xQc forces the hostages to *SING*\", 1.21x) or adds a question/negation")
-    if gta and found and not has_stake(hook, names):
-        notes.append("no concrete stake: name the number, amount, consequence or character at stake (\"NOT ready for "
-                     "*Trevor*\", \"him to be *13*\", \"$500K painting\"); our flops named only a vague object "
-                     "(\"USB\", \"marlin\", \"the betrayal\")")
-    if RAGE_BAIT.search(text):
-        notes.append("rage-bait wording measured ~0.84x on 3,481 gaming Shorts: ask the viewer for a verdict instead "
-                     "(\"Is xQc's aim *legit*?!\")")
     if (hook or "").count("*") not in (0, 2):
         fails.append("unbalanced *keyword* markup")
     if not found:
@@ -358,12 +326,11 @@ def check_picks(picks, cfg=None, words=None, load=None):
     job's transcript `words` (source seconds; `load(job)` for other jobs' segments)."""
     from .playbook import for_profile
     gta, topic, playbook = is_gta(cfg), title_topic(cfg), for_profile(cfg)
-    names = [w for c in (cfg or {}).get("channels") or [] for w in str(c.get("name", "")).split()]
     report = {}
     for n, pick in enumerate(picks, 1):
         entry = {}
         for h in pick.get("hooks") or [pick.get("hook", "")]:
-            f, nt = check_hook(h, gta, names)
+            f, nt = check_hook(h, gta)
             if f or nt:
                 entry.setdefault("hooks", {})[h] = {"fails": f, "notes": nt} if nt else {"fails": f}
         tags = pick.get("hashtags") or []
@@ -405,20 +372,11 @@ def check_picks(picks, cfg=None, words=None, load=None):
                 + [x for x in [check_music(pick, cw)] if x]
         if edit:
             entry["edit"] = edit
-        if gta and len(hs) >= 2 and not any(is_debate(x) for x in hs + ts):
-            entry["debate"] = ("no hook or title asks the viewer for a verdict: if the clip has a real disagreement, "
-                               "add one (\"Is xQc's aim *legit*?!\", \"Was Kai *wrong* for this?\"); skip if it has none")
         if len(pick.get("hooks") or []) >= 3 and len(used) < 3:
             entry["variety"] = f"hooks only use {sorted(used)}: give each variant a different structure to A/B test"
         if entry:
             report[f"video {n}"] = entry
     return report
-
-
-def is_debate(text):
-    """A verdict question the viewer can argue in the comments."""
-    t = plain(text)
-    return bool("?" in t and DEBATE.search(t) and VERDICT.search(t))
 
 
 def has_fails(report):

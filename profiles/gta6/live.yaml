@@ -12,6 +12,3 @@ streams:
 - name: KaiCenat-youtube
   url: https://www.youtube.com/@KaiCenat/live
   topic_only: true
-- name: caseoh_-twitch
-  url: https://www.twitch.tv/caseoh_
-  topic_only: true

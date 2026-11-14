@@ -18,14 +18,6 @@ LOCAL_BIN = Path("~/.local/bin").expanduser()
 FAST_MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
 PIP = {"yaml": "pyyaml", "PIL": "pillow", "numpy": "numpy", "onnx_asr": "onnx-asr[cpu,hub]==0.12.0"}
 MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin"
-# YouTube bot check fix: bgutil PO token plugin + its token script (github.com/Brainicism/bgutil-ytdlp-pot-provider),
-# and the EJS challenge solver a pip-installed yt-dlp lacks (Homebrew's yt-dlp bundles it).
-POT_VERSION = "2.0.2"
-POT_HOME = Path("~/bgutil-ytdlp-pot-provider").expanduser()  # the plugin's default script location
-POT_ZIP = Path("~/.config/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip").expanduser()
-POT_ZIP_URL = (f"https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/{POT_VERSION}/"
-               "bgutil-ytdlp-pot-provider.zip")
-EJS = "yt-dlp-ejs==0.8.0"
 COMMANDS = [(ROOT / ".claude/commands", Path("~/.claude/commands").expanduser()),
             (ROOT / ".codex/prompts", Path("~/.codex/prompts").expanduser())]
 
@@ -41,32 +33,6 @@ def _has_module(name):
 def uses_whisper():
     from .config import load
     return load().get("asr", "parakeet") == "whisper"
-
-
-def youtube_fix():
-    """(checks, plan, lines) for getting past YouTube's "confirm you're not a bot" on a flagged IP."""
-    server = POT_HOME / "server"
-    plugin = _has_module("yt_dlp_plugins.extractor.getpot_bgutil") or POT_ZIP.exists()
-    script = (server / "build/generate_once.js").exists()
-    ejs = not _has_module("yt_dlp") or _has_module("yt_dlp_ejs")
-    checks = [("yt-dlp PO token plugin (bgutil)", plugin), ("bgutil PO token script", script)]
-    plan, lines = [], []
-    if not plugin:
-        plan.append(["curl", "-fsSL", "--create-dirs", "-o", str(POT_ZIP), POT_ZIP_URL])
-    if not script:
-        if not shutil.which("node"):
-            lines.append("Node.js (>= 22) is missing: install it to build the bgutil PO token script.")
-        else:
-            if not server.exists():
-                plan.append(["git", "clone", "--depth", "1", "--branch", POT_VERSION,
-                             "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git", str(POT_HOME)])
-            plan += [["npm", "--prefix", str(server), "ci"],
-                     [str(server / "node_modules/.bin/tsc"), "-p", str(server)]]
-    if _has_module("yt_dlp"):
-        checks.append(("yt-dlp challenge solver (yt-dlp-ejs)", ejs))
-        if not ejs:
-            plan.append([sys.executable, "-m", "pip", "install", EJS])
-    return checks, plan, lines
 
 
 def missing():
@@ -135,8 +101,7 @@ def linux_plan(tools, mods, demucs):
 
 
 def run(install=False, dry_run=False):
-    from .config import code_version
-    lines = [f"clipper code: {code_version()} (compare with the other machines that render)"]
+    lines = []
     tools, mods, demucs, model = missing()
     plan = []
     if not IS_MAC:
@@ -162,10 +127,6 @@ def run(install=False, dry_run=False):
               ("demucs (voice separation, optional)", not demucs)]
     if uses_whisper():
         checks.append(("whisper model", not model))
-    yt_checks, yt_plan, yt_lines = youtube_fix()
-    checks += yt_checks
-    plan += yt_plan
-    lines += yt_lines
     for name, ok in checks:
         lines.append(f"{'ok     ' if ok else 'MISSING'}  {name}")
     for cmd in plan:
