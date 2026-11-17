@@ -1,0 +1,3 @@
+# Live streams (and their VODs) to clip while they're on topic. Managed by `python3 -m clipper --profile gta-br live add`.
+# Add only streamers you authorized, e.g. `live add twitch:nome kick:nome`.
+streams: []

@@ -36,6 +36,9 @@ def timestamp_link(url, seconds):
     """A link to the moment; live recordings point at the channel, which has no timestamp to jump to."""
     if "youtube.com/watch" in url:
         return f"{url}&t={int(seconds)}s"
+    if "twitch.tv/videos/" in url:  # a Twitch VOD (finished or still live) jumps to h/m/s
+        s = int(seconds)
+        return f"{url.split('?')[0]}?t={s // 3600}h{s % 3600 // 60}m{s % 60}s"
     return url
 
 

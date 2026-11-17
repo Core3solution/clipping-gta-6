@@ -84,19 +84,32 @@ def font_for(name, size, text):
 SWEARS = re.compile(r"^((mother)?f+u+c+k+\w*|f+u+k+|sh+i+t+\w*|bull ?shit|b+i+t+c+h+\w*|ass(hole|holes|es)?|"
                     r"dumbass|jackass|bastards?|dick(s|head)?|puss(y|ies)|cunts?|whores?|sluts?|damn(it)?|goddamn)$")
 DROPPED = re.compile(r"^n+[i1]+g+(a|ah|as|az|er|ers|guh|gas)$")  # slurs leave the captions entirely
+# Brazilian Portuguese, same rules: whole words, vowel masked (P*RRA, C*RALHO, F*DA); slurs dropped.
+SWEARS_PT = re.compile(r"^(porra\w*|caralh\w*|krl|crl|merd\w*|put[ao]s?|putaria\w*|pqp|fdp|vsf|tnc|"
+                       r"fod[aeio]\w*|fudid[ao]s?|cus?|buceta\w*|arrombad[ao]s?|cacete\w*|bosta\w*|"
+                       r"desgraçad[ao]s?|cuzã?o|corn[oa]s?)$")
+DROPPED_PT = re.compile(r"^(viad[ao]s?|veadinh[ao]s?|bichas?|traveco\w*)$")
 
 
-def censor(word):
-    """'fucking!' -> 'F*CKING!' (case kept), 'asshole' -> '@SSHOLE'; a slur -> None; anything else unchanged."""
+def censor(word, extra=None, allow=()):
+    """'fucking!' -> 'F*CKING!' (case kept), 'asshole' -> '@SSHOLE', 'porra' -> 'p*rra'; a slur -> None; anything else
+    unchanged. `extra` is an optional compiled pattern of more words to mask; words in `allow` are never touched."""
     m = re.match(r"^([^\w]*)([\w']+)([^\w]*)$", word or "")
     if not m:
+        if "-" in (word or ""):  # foda-se, filho-da-puta: each part on its own
+            parts = [censor(x, extra, allow) for x in word.split("-")]
+            return None if None in parts else "-".join(parts)
         return word
     pre, body, post = m.groups()
     low = body.lower().replace("'", "")
-    if DROPPED.match(low):
-        return None
-    if not SWEARS.match(low):
+    if low in allow:
         return word
+    if DROPPED.match(low) or DROPPED_PT.match(low):
+        return None
+    if not (SWEARS.match(low) or SWEARS_PT.match(low) or (extra is not None and extra.match(low))):
+        return word
+    if not re.search(r"[aeiouáéíóúâêôãõ]", low[1:]):  # pqp, krl: mask the middle letter
+        return pre + body[0] + "*" + body[2:] + post if len(body) > 2 else word
     stem = re.search(r"(?i)f(u)+c?k|sh(i)+t|b(i)+tch|d(i)ck|p(u)ss|c(u)nt|wh(o)re|sl(u)t|d(a)mn|b(a)stard|(a)ss",
                      body)
     if stem:
@@ -108,14 +121,27 @@ def censor(word):
     return pre + masked + post
 
 
-def censor_words(words):
+def censor_rules(setting):
+    """`censor_captions` from the config -> (on, extra pattern, allowed words). True/False keep the original meaning;
+    a dict adds words: {"extra": ["mlk"], "allow": ["cu"]} (whole words, lowercase)."""
+    if isinstance(setting, dict):
+        extra = [re.escape(str(x).lower()) for x in setting.get("extra") or []]
+        allow = {str(x).lower() for x in setting.get("allow") or []}
+        return setting.get("enabled", True), (re.compile("^(" + "|".join(extra) + ")$") if extra else None), allow
+    return bool(setting), None, set()
+
+
+def censor_words(words, setting=True):
     """Caption words with swears masked and slurs dropped (labels are left as written)."""
+    on, extra, allow = censor_rules(setting)
+    if not on:
+        return list(words)
     out = []
     for w in words:
         if w.get("label"):
             out.append(w)
             continue
-        c = censor(str(w["w"]))
+        c = censor(str(w["w"]), extra, allow)
         if c:
             out.append(dict(w, w=c))
     return out
@@ -295,7 +321,7 @@ def render_hook(text, path, style="box", layout="fit"):
 def write_overlay(words, clip_start, clip_end, out_dir, layout="fit", style="bold", censored=True):
     """Render caption PNGs and an FFmpeg concat list that shows each for as long as it's on screen."""
     if censored:
-        words = censor_words(words)
+        words = censor_words(words, censored)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     caption_y = LAYOUTS.get(layout, LAYOUTS["fit"])["caption_y"]

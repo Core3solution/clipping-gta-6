@@ -93,10 +93,10 @@ def for_profile(cfg=None):
 
 RP = re.compile(r"\b(rp|roleplay|role-play|nopixel|heist|skit|prank|trolling|funny|hostage|cops?)\b", re.I)
 NEWS = re.compile(r"\b(news|update|leak(ed|s)?|features?|price|cost|release|confirmed|details|everything|map|"
-                  r"announcement|trophies|rumou?rs?)\b", re.I)
-SHOWCASE = re.compile(r"\b(screenshots?|trailer|graphics|cover art|images|footage)\b", re.I)
-GAMEPLAY = re.compile(r"\b(speedrun|glitch|stunt|fail|chaos|mod|backflip|challenge|world record|pacifist)\b", re.I)
-REACT = re.compile(r"\breact(s|ion|ing)?\b", re.I)
+                  r"announcement|trophies|rumou?rs?|notícias?|novidades?|vazou|vazamento|preço|lançamento|confirmad[oa]|detalhes|tudo sobre|mapa|rumores?)(?!\w)", re.I)
+SHOWCASE = re.compile(r"\b(screenshots?|trailer|graphics|cover art|images|footage|imagens|gráficos|graficos|capa)(?!\w)", re.I)
+GAMEPLAY = re.compile(r"\b(speedrun|glitch|stunt|fail|chaos|mod|backflip|challenge|world record|pacifist|bug|manobra|desafio|recorde|perseguição|perseguicao|fuga|caos)(?!\w)", re.I)
+REACT = re.compile(r"\breact(s|ion|ing)?\b|\b(reagindo|reação|reacao|react)(?!\w)", re.I)
 
 
 def guess_type(title, profile, words_per_min, loud_events, multi_voice_hint=False):

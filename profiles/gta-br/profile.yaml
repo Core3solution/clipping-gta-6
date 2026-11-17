@@ -1,0 +1,62 @@
+# GTA 6 Brasil: merged over watchlist.yaml. Streamers in creators.yaml (VODs/uploads) and live.yaml (lives).
+# Hooks, titles and descriptions are written in Brazilian Portuguese (see .claude/commands/clip.md, "Perfil gta-br").
+
+research: gta
+language: pt                # whisper.cpp language; Parakeet v3 detects it on its own
+asr: parakeet
+
+keywords: [gta 6, gta vi, gta, grand theft auto, vice city, leonida, rockstar, lucia, jason, gameplay, trailer]
+hashtags: ["#gta6", "#gtavi", "#gta6brasil", "#shorts"]
+
+require_topic: true
+topic_patterns: ["\\bgta ?(6|vi)\\b", "grand theft auto (6|vi)\\b", "#gta6", "#gtavi", "\\bleonida\\b"]
+exclude_title_patterns: ["\\bgta ?(5|v|iv|4)\\b", "gta online", "\\bgtao\\b", "red dead", "\\brp\\b", "roleplay",
+  "(antes|esperando|até) (do |o )?gta ?(6|vi)\\b", "\\bmemes?\\b"]
+
+search: ["GTA 6 gameplay português", "GTA 6 reagindo", "GTA 6 detalhes escondidos", "GTA 6 curiosidades"]
+
+# Hype words and laughter as Brazilian streamers say them (matched on the transcript, 1-4 words, lowercase).
+# Words said all the time ("mano", "chat", "gente") are left out: they would flatten the signal.
+hype_words: [meu deus, nossa, caraca, caramba, mano do céu, não acredito, nao acredito, que isso, olha isso,
+  socorro, corre, vai vai, bora, eita, vixe, misericórdia, absurdo, insano, surreal, ridículo, que loucura,
+  clipa, clipa isso, clipa aí, kkkk, kkkkk, kkkkkk, haha, hahaha, hahahaha, rapaz, puts, putz, porra,
+  caralho, pqp, tá de brincadeira, mentira, oxe, pelo amor de deus, nunca vi, olha o tamanho]
+
+# Captions: Portuguese and English swears masked; slurs dropped. Add or allow words here.
+censor_captions: {enabled: true, extra: [], allow: []}
+
+# Encoder: auto = h264_nvenc on an NVIDIA GPU (RTX 3060 under WSL2), else libx264 veryfast.
+video_encoder: auto
+x264_preset: veryfast      # used when there is no NVIDIA GPU (cloud, 2 vCPUs)
+zoom_engine: perspective   # sub-pixel punch-in (smooth) instead of the original pixel-stepped scale
+
+# Names the speech recognition gets wrong (whole words, any case); a pick's own caption_fixes win.
+caption_fixes: {lúcia: Lucia, luzia: Lucia, jasão: Jason, leônida: Leonida, leonidas: Leonida, vaice: Vice,
+  rocstar: Rockstar, roquestar: Rockstar}
+vocabulary: [Lucia, Jason, Leonida, Vice City, Rockstar, GTA 6]
+
+# Telegram delivery: one message per rendered MP4, with Aprovar/Rejeitar buttons. Secrets live in .env:
+# TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (never in this file).
+telegram: {enabled: true}
+
+# VODs: finished lives and the new part of lives still running (Twitch), in chunks.
+vods:
+  chunk_minutes: 30         # each chunk becomes one job, like the live recorder's
+  max_chunks_per_run: 4     # per run, across all streamers (a cloud routine has limited time)
+  lookback_hours: 48        # only VODs that started within this window
+  min_chunk_minutes: 10     # an in-progress VOD waits until this much new footage exists
+
+# Clip-type examples in Brazilian Portuguese (same structures as the English research).
+playbook:
+  reaction:
+    examples: ["Eu vendo *GTA 6* com a minha mãe no quarto", "Ele NÃO estava pronto pra *isso*",
+               "Por que ele não conseguiu assistir?", "Espera a cara dele no final..."]
+  comedy:
+    examples: ["POV: você é o refém do assalto no *GTA 6*", "Ninguém esperava os reféns *CANTANDO*",
+               "Por que os reféns estão cantando?", "Espera os reféns começarem a cantar..."]
+  news:
+    examples: ["4 detalhes NOVOS do *GTA 6*", "O mapa do *GTA 6* é 2x MAIOR", "Criança NÃO pode jogar *GTA 6*",
+               "O que acontece se você atirar na lua?"]
+  gameplay:
+    examples: ["Ele zerou em 3 minutos", "A fuga mais insana do *GTA 6*", "Como ele sobreviveu a essa queda?",
+               "Olha a viatura no final..."]

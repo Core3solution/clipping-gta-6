@@ -5,58 +5,87 @@ Every structure below appeared on a 500k+ video; a hook passes if it uses at lea
 import re
 
 STRUCTURES = [
-    # name, pattern, sample it came from
-    ("question", r"\?|^(why|how|what|who|which|where|did you|have you|do you|would you|can you|will i)\b",
+    # name, pattern, sample it came from. Each pattern is bilingual (English | Brazilian Portuguese): the measured
+    # structures are the same idea in both languages, so a gta-br hook is checked and ranked like an English one.
+    ("question", r"\?|^(why|how|what|who|which|where|did you|have you|do you|would you|can you|will i)\b|"
+                 r"^(por ?que|como|o que|quem|qual|onde|quando|você já|vc já|será que|sabia que)\b",
      "What Happens If You Shoot The Moon In GTA 6? (1.7M)"),
-    ("tease", r"\.\.\.|…|\b(this|these|wait|watch|until|guess|happens|the reason|here'?s why)\b",
+    ("tease", r"\.\.\.|…|\b(this|these|wait|watch|until|guess|happens|the reason|here'?s why)\b|"
+              r"\b(isso|isto|esse|essa|esses|essas|espera|olha|até|adivinha|acontece|o motivo|repara)\b",
      "I Can't Believe It's Real... (1.3M)"),
-    ("withheld / negation", r"\b(can'?t|won'?t|didn'?t|couldn'?t|wasn'?t|isn'?t|not|never|nobody|no one|only)\b",
+    ("withheld / negation", r"\b(can'?t|won'?t|didn'?t|couldn'?t|wasn'?t|isn'?t|not|never|nobody|no one|only)\b|"
+                            r"\b(não|nao|nunca|ninguém|ninguem|nem|jamais|só)(?!\w)",
      "KIDS CAN'T PLAY GTA 6 (51M)"),
-    ("number promise", r"^\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(\w+\s+){0,2}"
-                       r"(things|features|reasons|ways|secrets|details|clips|facts|changes|mistakes|easter eggs)\b",
+    ("number promise", r"^\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten|um|uma|dois|duas|três|tres|quatro|"
+                       r"cinco|seis|sete|oito|nove|dez)\s+(\w+\s+){0,2}"
+                       r"(things|features|reasons|ways|secrets|details|clips|facts|changes|mistakes|easter eggs|"
+                       r"coisas|detalhes|segredos|motivos|jeitos|formas|mudanças|mudancas|erros|curiosidades|"
+                       r"funções|funcoes|recursos|novidades|fatos|lugares|carros|armas)(?!\w)",
      "4 NEW FEATURES COMING IN GTA 6 (10M)"),
-    ("shock fact", r"\b\d+[\d,.]*\s*(x|%|years?|hours?|minutes?|days?|million|billion|k|times|miles?|dollars?)\b|\$\d",
+    ("shock fact", r"\b\d+[\d,.]*\s*(x|%|years?|hours?|minutes?|days?|million|billion|k|times|miles?|dollars?|"
+                   r"anos|horas|minutos|dias|milhões|milhoes|bilhões|bilhoes|mil|vezes|reais|km)(?!\w)|\$\d|r\$\s?\d",
      "HE'S 72 YEARS OLD (1M)"),
-    ("first-person claim", r"^(i|i'm|im|i'll|i've|we|we're)\b", "I'M GONNA PLAY GTA 6! (2M)"),
+    ("first-person claim", r"^(i|i'm|im|i'll|i've|we|we're)\b|^(eu|tô|to|estou|vou|nós|a gente)(?!\w)",
+     "I'M GONNA PLAY GTA 6! (2M)"),
     ("relatable situation", r"^(me|us|my|when|whenever|pov|how|that moment|every|you|your)\b|"
                             r"\b(my|your|his|her) (mom|mum|dad|parents?|girlfriend|gf|boyfriend|wife|brother|sister|"
-                            r"teacher|boss|friends?)\b|\bin the room\b|\bwalks? in\b",
+                            r"teacher|boss|friends?)\b|\bin the room\b|\bwalks? in\b|"
+                            r"^(eu quando|quando|toda vez|aquele momento|todo mundo|ninguém:|você|vc|seu|sua)(?!\w)|"
+                            r"\b(minha|sua|tua) (mãe|mae|namorada|esposa|irmã|irma|vó|avó)\b|"
+                            r"\b(meu|seu|teu) (pai|namorado|irmão|irmao|chefe|amigo|professor)\b",
      "How Playing GTA 6 Is Gonna Be 😂 (5M)"),
 ]
 # A short "who does what" premise with one shouted twist word: the creators' own titles do this
 # ("xQc FORCES Weazel News Ron Otterman to Rob a Bank", "Kids WON'T Be Able To Play GTA 6!").
-CAPS_TWIST = re.compile(r"\b(?!(?:GTA|RP|VI|POV|NPC|I|OK)\b)[A-Z][A-Z']+\b")
+# Accented capitals count ("ele NÃO esperava").
+CAPS_TWIST = re.compile(r"\b(?!(?:GTA|RP|VI|POV|NPC|I|OK)\b)[A-ZÀ-Ý][A-ZÀ-Ý']+(?!\w)")
 STRUCTURES = [(n, re.compile(p, re.I), ex) for n, p, ex in STRUCTURES]
 STRUCTURES.append(("premise + twist", CAPS_TWIST, "xQc FORCES Weazel News Ron Otterman to Rob a Bank (source title)"))
 STRUCTURES.append(("superlative", re.compile(r"\b(best|fastest|worst|biggest|craziest|smartest|most|first ever|"
-                                           r"world'?s|#1|ever)\b", re.I), "World's Best Sniper in Black Ops 7"))
+                                           r"world'?s|#1|ever|melhor|melhores|pior|piores|maior|maiores|"
+                                           r"mais (rápid[oa]s?|insan[oa]s?|louc[oa]s?|difícil|car[oa]s?|rar[oa]s?|bizarr[oa]s?|absurd[oa]s?|épic[oa]s?)|"
+                                           r"primeira vez|do mundo|recorde)(?!\w)", re.I),
+                   "World's Best Sniper in Black Ops 7"))
 # Words that describe the clip instead of teasing it; fine inside a tease ("Wait for his reaction...").
-SPOILERS = re.compile(r"\b(reaction|compilation|highlights?|recap|full video|part \d+|episode)\b", re.I)
+SPOILERS = re.compile(r"\b(reaction|compilation|highlights?|recap|full video|part \d+|episode|"
+                      r"reação|reacao|reagindo|compilado|melhores momentos|resumo|vídeo completo|parte \d+|"
+                      r"episódio|episodio|ep\.? ?\d+)(?!\w)", re.I)
 # Spoken first lines the viral clips opened on (cold opens), vs filler that loses the swipe.
 OPENING_TYPES = [
-    ("action cold open", re.compile(r"!|^(go|run|look|wait|watch|stop|no|yo|oh|bro|so i|get)\b", re.I)),
+    ("action cold open", re.compile(r"!|^(go|run|look|wait|watch|stop|no|yo|oh|bro|so i|get)\b|"
+                                    r"^(vai|corre|olha|espera|para|não|nao|mano|meu deus|caraca|socorro)(?!\w)", re.I)),
     # dropped straight into the scene: interjections, sound effects, someone mid-conversation
     ("in-scene cold open", re.compile(r"^(\*|\[|ooh|ah+|oh|hey|sir|ma'?am|bro|dude|take|i'?m (ready|gonna|going)|"
-                                      r"i'?m about to|let'?s)\b|^\*", re.I)),
-    ("question", re.compile(r"\?|^(did you|have you|do you|what|why|how|will|would|can)\b", re.I)),
+                                      r"i'?m about to|let'?s)\b|^\*|"
+                                      r"^(eita|opa|ué|vixe|nossa|ai|ó|oi|senhor|moço|moça|bora|vamo|vou)(?!\w)", re.I)),
+    ("question", re.compile(r"\?|^(did you|have you|do you|what|why|how|will|would|can)\b|"
+                            r"^(você|vc|o que|por ?que|como|cadê|será)(?!\w)", re.I)),
     ("number promise", STRUCTURES[3][1]),
     ("claim / news", re.compile(r"^(this is|it looks like|it doesn'?t|sorry|we know|according|breaking|"
-                                r"there'?s only|nobody|the \w+ of|\w+ fans)\b", re.I)),
-    ("setup tease", re.compile(r"^(if you|you want to see|you won'?t believe|imagine|picture this)\b", re.I)),
+                                r"there'?s only|nobody|the \w+ of|\w+ fans)\b|"
+                                r"^(isso é|parece que|desculpa|a gente sabe|segundo|confirmado|ninguém|só tem)(?!\w)",
+                                re.I)),
+    ("setup tease", re.compile(r"^(if you|you want to see|you won'?t believe|imagine|picture this)\b|"
+                               r"^(se você|vocês não vão acreditar|imagina|olha só)(?!\w)", re.I)),
 ]
 FILLER_OPEN = re.compile(r"^(um+|uh+|so yeah|anyway|okay so|alright so|like,|hey guys|what'?s up guys|welcome back|"
                          r"first of all|before we|(chat|chap|guys),? before|alright chat|okay chat|let'?s go ahead|"
-                         r"in today'?s video)\b", re.I)
+                         r"in today'?s video)\b|"
+                         r"^(é+|hã+|então|entao|tipo|bom|enfim|beleza|fala galera|salve galera|e aí galera|"
+                         r"no vídeo de hoje|antes de tudo|chat,? antes)(?!\w)", re.I)
 
 
 STOP = set("the a an in on of to and for is are you your this that these with at it be was just my i me we so he she "
            "his her they them him its im i'm it's what why how who when wait watch end guys nobody expected did does "
-           "do can will would gta rp vi pov mid really actually".split())
+           "do can will would gta rp vi pov mid really actually".split()) | set(
+    "o a os as um uma uns umas de do da dos das no na nos nas em por para pra pro com e é ou que se ele ela eles elas "
+    "eu tu você vc nós seu sua meu minha isso isto esse essa aqui ali lá já só foi era ser tá ta tô to vai mano cara "
+    "galera chat quando como porque porquê olha espera ninguém esperava fez faz também mais muito mesmo".split())
 
 
 def content_words(text):
     """Words that say what's happening; "Wait for the harmony..." has one, "Why are the hostages singing?" two."""
-    return [w for w in re.findall(r"[a-z0-9']+", plain(text).lower()) if w not in STOP and len(w) > 2]
+    return [w for w in re.findall(r"[\w']+", plain(text).lower()) if w not in STOP and len(w) > 2]
 
 
 def plain(text):
@@ -121,12 +150,13 @@ def check_title(title, hashtags=(), topic=GTA6_TITLE):
     fails, notes = [], []
     if len(title) > 100:
         fails.append(f"{len(title)} chars (max 100)")
-    caps = [w for w in re.findall(r"[A-Za-z']+", title) if len(w) > 1 and w.isupper() and w not in ("GTA", "POV", "VI")]
+    caps = [w for w in re.findall(r"[A-Za-zÀ-ÿ']+", title) if len(w) > 1 and w.isupper() and w not in ("GTA", "POV", "VI")]
     if len(caps) > 2:
         fails.append(f"{len(caps)} CAPS words: emphasise 1-2 (\"Cost HOW MUCH!?\")")
     if re.search("[A-Z]", title) and not re.search("[a-z]", title):
         fails.append("all-caps title (0.90x on 3,481 gaming Shorts, 0.68x on GTA): capitalise 1-2 words")
-    if re.search(r"\b(update|announce\w*|explained|patch|now live|available now)\b", title, re.I):
+    if re.search(r"\b(update|announce\w*|explained|patch|now live|available now|atualização|atualizacao|anunciad\w*|"
+                 r"explicad\w*|já disponível|ja disponivel|saiu agora)(?!\w)", title, re.I):
         notes.append("announcement wording measured 0.85x: lead with what changed (\"GTA 6 Map Is 2x BIGGER\")")
     if topic and not re.search(topic["pattern"], title, re.I):
         tagged = any(re.search(topic["hashtag"], h, re.I) for h in hashtags)
@@ -198,7 +228,9 @@ def check_labels(pick):
 
 
 OPENING_FILLER = {"so", "um", "umm", "uh", "uhh", "like", "okay", "ok", "alright", "yeah", "anyway", "well", "great",
-                  "and", "but", "chat", "bro", "hmm"}
+                  "and", "but", "chat", "bro", "hmm",
+                  # Brazilian Portuguese fillers
+                  "é", "éé", "hã", "hmm", "então", "entao", "tipo", "bom", "enfim", "beleza", "né", "e", "mas", "galera"}
 
 
 def clip_labels(pick):
@@ -231,7 +263,7 @@ def clip_words(pick, words, load=None):
 
 
 def _bare(w):
-    return re.sub(r"[^a-z0-9']", "", str(w).lower())
+    return re.sub(r"[^\w']", "", str(w).lower())
 
 
 def check_opening(pick, words):

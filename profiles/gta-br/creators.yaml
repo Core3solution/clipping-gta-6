@@ -1,0 +1,6 @@
+# Managed by `python3 -m clipper creators`. Every upload is still checked for GTA 6.
+# Official channel first (trailers and official footage: source_kind "oficial"). Add the Brazilian streamers you
+# authorized with `python3 -m clipper --profile gta-br creators add @canal`.
+creators:
+- name: Rockstar Games
+  url: https://www.youtube.com/@RockstarGames/videos

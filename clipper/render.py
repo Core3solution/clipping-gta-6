@@ -126,12 +126,25 @@ def clip_fx(pick, words, dur):
     return sorted(out, key=lambda f: f["t"])
 
 
-def fx_filter(fx, dur):
-    """FFmpeg filters for the video under the captions: punch-in zooms (scaled up per frame, cropped back to
-    1080x1920) and colour flashes (lime unless `color` says otherwise; 0.45 then 0.2 opacity over 0.25s). Empty when there's nothing to draw."""
+def fx_filter(fx, dur, zoom_engine="scale"):
+    """FFmpeg filters for the video under the captions: punch-in zooms and colour flashes (lime unless `color` says
+    otherwise; 0.45 then 0.2 opacity over 0.25s). Empty when there's nothing to draw.
+
+    zoom_engine `scale` (original): scaled up per frame to even sizes and cropped back to 1080x1920, which steps a
+    pixel at a time. `perspective`: the same curve as a sub-pixel crop with cubic interpolation, so the punch-in
+    glides instead of shaking (technique from Editonny's camera filter, MIT, Matheus Gomes; see THIRD_PARTY.md)."""
     parts = []
     zooms = [f["t"] for f in fx or [] if f["type"] == "zoom" and f["t"] < dur]
-    if zooms:
+    if zooms and zoom_engine == "perspective":
+        # perspective has no `t`: frames are counted at a fixed 30 fps (the render's output rate)
+        tt = "(in/30)"
+        pulse = "+".join(f"if(between({tt},{z:.3f},{z + ZOOM_S:.3f}),1-({tt}-{z:.3f})/{ZOOM_S},0)" for z in zooms)
+        k = f"(1+{ZOOM}*min(1,{pulse}))"
+        left, top = f"W*0.5*(1-1/{k})", f"H*0.5*(1-1/{k})"
+        right, bottom = f"W*0.5*(1-1/{k})+W/{k}", f"H*0.5*(1-1/{k})+H/{k}"
+        parts.append(f"fps=30,perspective=x0='{left}':y0='{top}':x1='{right}':y1='{top}':x2='{left}':y2='{bottom}':"
+                     f"x3='{right}':y3='{bottom}':interpolation=cubic:eval=frame")
+    elif zooms:
         pulse = "+".join(f"if(between(t,{z:.3f},{z + ZOOM_S:.3f}),1-(t-{z:.3f})/{ZOOM_S},0)" for z in zooms)
         k = f"(1+{ZOOM}*min(1,{pulse}))"
         parts.append(f"scale=w='trunc(1080*{k}/2)*2':h='trunc(1920*{k}/2)*2':eval=frame,crop=1080:1920")
@@ -190,6 +203,36 @@ def prepare_clip(job, pick, fallback_words, cfg, tmp):
             "transcript": source, "voices_separated": bool(stems), "words": words, "fx": fx, "music": used}
 
 
+_NVENC = {}
+
+
+def nvenc_available():
+    """True when FFmpeg can really encode with h264_nvenc here (an NVIDIA GPU with its driver, e.g. an RTX 3060 under
+    WSL2). Listing the encoder isn't enough, so one tiny frame is encoded once and the answer cached."""
+    if "ok" not in _NVENC:
+        try:
+            res = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256:d=0.1",
+                                  "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-"],
+                                 capture_output=True, timeout=30)
+            _NVENC["ok"] = res.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            _NVENC["ok"] = False
+    return _NVENC["ok"]
+
+
+def encoder_args(cfg, stage="final"):
+    """Video encoder flags. `video_encoder`: libx264 (default, the original behaviour), h264_nvenc, or auto (NVENC when
+    it works, else libx264). `x264_preset` sets libx264's speed (veryfast suits a small cloud CPU). `intermediate` is
+    the near-lossless per-segment encode of story cuts."""
+    cfg = cfg or {}
+    want = cfg.get("video_encoder", "libx264")
+    if want == "h264_nvenc" or (want == "auto" and nvenc_available()):
+        return ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", "16" if stage == "intermediate" else "21",
+                "-b:v", "0"]
+    preset = "veryfast" if stage == "intermediate" else cfg.get("x264_preset", "medium")
+    return ["-c:v", "libx264", "-preset", preset, "-crf", "16" if stage == "intermediate" else "20"]
+
+
 def encode_variant(job, pick, prep, hook, cfg, out_path, tmp):
     s, e = float(pick["start"]), float(pick["end"])
     dur = e - s
@@ -200,7 +243,7 @@ def encode_variant(job, pick, prep, hook, cfg, out_path, tmp):
            "-i", str(job / "source.mp4"), "-f", "concat", "-safe", "0", "-i", str(prep["captions"]),
            "-loop", "1", "-framerate", "30", "-t", f"{dur:.3f}", "-i", str(hook_png), "-i", str(prep["bed"])]
     vf = video_filter(layout, source_size(job / "source.mp4"))
-    fxs = fx_filter(prep.get("fx"), dur)
+    fxs = fx_filter(prep.get("fx"), dur, (cfg or {}).get("zoom_engine", "scale"))
     if fxs:  # zooms and flashes hit the video only; captions and hook stay put
         vf += f";[v1]{fxs}[v1x]"
     vf += (f";[1:v]fps=30,format=rgba[cap];[{'v1x' if fxs else 'v1'}][cap]overlay=0:0:eof_action=pass[v2];"
@@ -213,7 +256,7 @@ def encode_variant(job, pick, prep, hook, cfg, out_path, tmp):
     else:
         af = f"[3:a]{loud}[aout]"
     cmd += ["-filter_complex", f"{vf};{af}", "-map", "[v]", "-map", "[aout]", "-r", "30",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+            *encoder_args(cfg, "final"), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-t", f"{dur:.3f}", "-movflags", "+faststart",
             str(out_path)]
     subprocess.run(cmd, check=True)
@@ -229,16 +272,20 @@ def probe(path):
             "duration": round(float(d["format"]["duration"]), 2), "lufs": signals.integrated_loudness(path)}
 
 
-def post_description(desc, credits, hashtags):
+CREDIT_LINES = {"en": ("Clip from", "Clips from:"), "pt": ("Corte de", "Cortes de:")}
+
+
+def post_description(desc, credits, hashtags, lang="en"):
     """`credits`: (channel, link) per source; a story cut or multi-streamer edit credits every one."""
     # hashtags already written into the description aren't repeated after the credit line
     have = {w.lower() for w in re.findall(r"#\w+", desc)}
     extra = " ".join(t for t in hashtags if t.lower() not in have)
     credits = list({link: (ch, link) for ch, link in reversed(list(credits))}.values())[::-1]  # one line per link
+    one, many = CREDIT_LINES.get(lang, CREDIT_LINES["en"])
     if len(credits) == 1:
-        credit = f"Clip from {credits[0][0]}: {credits[0][1]}"
+        credit = f"{one} {credits[0][0]}: {credits[0][1]}"
     else:
-        credit = "Clips from:\n" + "\n".join(f"{ch}: {link}" for ch, link in credits)
+        credit = many + "\n" + "\n".join(f"{ch}: {link}" for ch, link in credits)
     return f"{desc}\n\n{credit}" + (f"\n\n{extra}" if extra else "")
 
 
@@ -390,7 +437,7 @@ def build_segment_job(pick, job, cfg, out):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{s:.3f}", "-t", f"{e - s:.3f}",
                         "-i", str(sj / "source.mp4"), "-filter_complex",
                         video_filter(layout, source_size(sj / "source.mp4")) + ";[v1]fps=30,format=yuv420p[v]",
-                        "-map", "[v]", "-map", "0:a:0", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
+                        "-map", "[v]", "-map", "0:a:0", *encoder_args(cfg, "intermediate"),
                         "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", f"{e - s:.3f}",
                         str(part)], check=True)
         parts.append(part)
@@ -429,7 +476,7 @@ def clip_markdown(n, pick, meta, cfg, variants, prep, creds=None, dur=None):
                      + (f"  →  post with title: {titles[i][:100]}" if paired else ""))
     lines += ["", "## Title options (YouTube Shorts, 100 max)"]
     lines += [f"{i}. {t[:100]} ({len(t[:100])})" for i, t in enumerate(titles, 1)]
-    lines += ["", "## Description", post_description(desc, creds, tags)]
+    lines += ["", "## Description", post_description(desc, creds, tags, (cfg or {}).get("language", "en"))]
     return "\n".join(lines) + "\n"
 
 
@@ -462,9 +509,9 @@ def upload_manifest(pick, meta, cfg, variants, titles, creds=None, job=None, mus
                     "hook_type": "none" if none else max(types, key=lambda t: table[t][0]) if types else None,
                     "arm": "no-hook" if none else "hook",
                     "title": (titles[i] if len(titles) == len(variants) else titles[0])[:100],
-                    "description": post_description(desc, creds, tags),
+                    "description": post_description(desc, creds, tags, (cfg or {}).get("language", "en")),
                     "hashtags": pick.get("hashtags") or [], "clip_type": pick.get("clip_type"),
-                    "campaign": pick.get("campaign"),
+                    "campaign": pick.get("campaign"), "source_kind": pick.get("source_kind"),
                     "source": creds[0][1], "sources": [link for _, link in creds],
                     "duration": v["check"].get("duration"), "footage": fp, "moment_at": when,
                     "predicted": pred.get(v["hook"]), "moment": moment, "music": list(music_used or [])})

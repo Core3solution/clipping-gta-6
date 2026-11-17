@@ -12,6 +12,8 @@ from . import cleanup as cleanup_mod
 from . import dub as dub_mod
 from . import live as live_mod
 from . import setup as setup_mod
+from . import telegram as telegram_mod
+from . import vods as vods_mod
 
 
 def _picks_from_ids(job, ids):
@@ -168,6 +170,16 @@ def main(argv=None):
     fr = sub.add_parser("frame", help="grab a gridded frame to locate the facecam for split layout")
     fr.add_argument("job")
     fr.add_argument("seconds", type=float)
+    tg = sub.add_parser("telegram", help="deliver rendered clips to Telegram, read Aprovar/Rejeitar and requested links")
+    tg.add_argument("action", choices=["send", "poll", "status", "requests", "notify", "chat-id"])
+    tg.add_argument("text", nargs="?", help="notify: the message; requests: a link to mark as produced (--done)")
+    tg.add_argument("--limit", type=int, help="send: at most N clips this run")
+    tg.add_argument("--dry-run", action="store_true", help="send: list what would go out, send nothing")
+    tg.add_argument("--done", action="store_true", help="requests: mark TEXT (a link) as produced")
+    vd = sub.add_parser("vods", help="recover finished VODs and the new part of lives still running (Twitch), in chunks")
+    vd.add_argument("action", choices=["scan", "fetch", "status"])
+    vd.add_argument("--max-chunks", type=int, help="fetch: chunks to download this run (default vods.max_chunks_per_run)")
+    vd.add_argument("--dry-run", action="store_true", help="fetch: show the chunks it would download")
     args = p.parse_args(argv)
     config.load_env()
     cfg = config.load(args.config, args.profile)
@@ -317,6 +329,34 @@ def main(argv=None):
                   f"{'' if h['footage'] else '(footage deleted) '}{h['text']}")
         if not hits:
             print(f"no line matching '{args.pattern}' in the last {args.hours:g} h")
+    elif args.cmd == "telegram":
+        a = args.action
+        if a == "send":
+            out = telegram_mod.send(cfg, limit=args.limit, dry_run=args.dry_run)
+        elif a == "poll":
+            out = telegram_mod.poll(cfg)
+        elif a == "status":
+            out = telegram_mod.status()
+        elif a == "requests":
+            out = telegram_mod.requests(args.text if args.done else None)
+        elif a == "notify":
+            if not args.text:
+                raise SystemExit("telegram notify precisa do texto")
+            telegram_mod.notify(args.text)
+            out = {"ok": True}
+        else:
+            out = telegram_mod.chat_ids()
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        if a == "send" and out.get("errors"):
+            sys.exit(1)
+    elif args.cmd == "vods":
+        if args.action == "scan":
+            out = vods_mod.scan(cfg)
+        elif args.action == "fetch":
+            out = vods_mod.fetch_chunks(cfg, args.max_chunks, args.dry_run)
+        else:
+            out = vods_mod.status()
+        print(json.dumps(out, indent=2, ensure_ascii=False))
     elif args.cmd == "frame":
         print(analyze_mod.grid_frame(config.job_dir(args.job), args.seconds))
 
