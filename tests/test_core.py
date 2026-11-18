@@ -1653,6 +1653,13 @@ class NoHookArmTests(unittest.TestCase):
         self.assertAlmostEqual(sum(arms) / len(arms), 0.33, delta=0.07)
         self.assertFalse(any(render.no_hook_arm({"start": s, "end": s + 20}, None, meta, 0) for s in range(50)))
 
+    def test_editor_can_pin_the_arm_for_one_clip(self):
+        from clipper import render
+        meta = {"id": "vid", "url": "https://youtube.com/watch?v=vid", "channel": "c"}
+        drawn = [s for s in range(0, 3000, 10) if render.no_hook_arm({"start": s, "end": s + 20}, None, meta, 0.33)]
+        self.assertFalse(render.no_hook_arm({"start": drawn[0], "end": drawn[0] + 20, "no_hook": False}, None, meta, 0.33))
+        self.assertTrue(render.no_hook_arm({"start": 0, "end": 20, "no_hook": True}, None, meta, 0))
+
     def test_no_hook_arm_renders_one_bannerless_mp4_with_the_best_title(self):
         from unittest import mock
         import json

@@ -482,7 +482,10 @@ def clip_markdown(n, pick, meta, cfg, variants, prep, creds=None, dur=None):
 
 def no_hook_arm(pick, job, meta, share):
     """Whether this clip posts with no on-screen hook (the A/B arm the results compare): a hash of its footage, so
-    the same moment always lands in the same arm, and about `share` of clips do."""
+    the same moment always lands in the same arm, and about `share` of clips do. A pick's `no_hook` (true/false)
+    pins the arm when the editor decides it (e.g. a story that needs its hook)."""
+    if "no_hook" in pick:
+        return bool(pick["no_hook"])
     if not share or share <= 0:
         return False
     fp = footage(pick, job, meta)[0]
