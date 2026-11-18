@@ -25,6 +25,8 @@ Atualize ao fim de cada sessão de desenvolvimento, em poucas linhas. O hook de 
 - Motor portado para Windows (suíte verde no Windows; Linux não verificado aqui, falta o CI após push). Commits locais `1df3396`, `c003fff`, `35422e0`, `9829f96`.
 - Davy Jones: histórico pela Kick desde 07h59 em blocos de 30 min (`jobs/live-vod-davyjones-kick-kick-138532295-*`, no D:), captura e análise em filas (`docs/pt-br/OPERACAO.md`). Catálogo e sinais do público em `exports/gta-br/2026-11-18/momentos.md`.
 - Tonyboy: gravação manual (OBS) pelo operador; live com restrição de idade, sem cookies no notebook. Alanzoka: à noite (Twitch, `live add twitch:alanzoka` + `vod_from`).
+- **Produção (17h): 10 vídeos do Davy Jones aprovados no QA** em `D:\GTA6-BR\exports\gta-br\2026-11-18\` (lista e catálogo em `momentos.md` dessa pasta; versões reprovadas em `D:\GTA6-BR\variantes\`). Destaque: a jornada até o fim do mapa (video 6, story cut de 44 s). Nada enviado ao Telegram (sem bot configurado) e nada publicado.
+- Curadoria feita até o bloco 025020 (até ~14h da live). Os blocos seguintes estão capturados/analisados conforme as filas avançam: próxima rodada começa no 026820.
 - Atenção: duas filas de análise ao mesmo tempo esgotam a RAM (16 GB, ~3 GB livres com o VS Code aberto) e incham o `pagefile.sys` no C:. Uma fila só.
 
 ## Próximos passos
