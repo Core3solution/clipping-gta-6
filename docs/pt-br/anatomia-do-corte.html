@@ -1,0 +1,375 @@
+<title>Anatomia de um Corte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Montserrat:wght@900&family=Bebas+Neue&display=swap">
+<style>
+/* Layout: a single column like an edit decision list; the story timeline and the two 9:16 frames are the visual anchors. */
+:root {
+  --bg: #F2F4F6; --surface: #FFFFFF; --ink: #141920; --muted: #5B6573; --line: #D8DDE4;
+  --coral: #D9434C; --teal: #0C7F84; --amber: #A87300;
+  --coral-soft: #FBE3E4; --teal-soft: #DDF1F1; --amber-soft: #F7ECD2;
+  --frame-dark: #0B0E12; --frame-face: #2B2622; --frame-sea: #1F6E86; --frame-sea2: #0E3F52;
+  --frame-room: #6E5B45; --frame-room2: #3A3026; --frame-yellow: #FFD23F; --frame-white: #FFFFFF; --frame-blue: #2E7DF6;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --hook: "Montserrat", "Arial Black", Impact, sans-serif;
+  --cap: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1116; --surface: #161B22; --ink: #E7EBF0; --muted: #9AA4B1; --line: #2A313B;
+  --coral: #FF6A72; --teal: #3EC2C4; --amber: #F0B43A;
+  --coral-soft: #3A1E22; --teal-soft: #12302F; --amber-soft: #352B14; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1116; --surface: #161B22; --ink: #E7EBF0; --muted: #9AA4B1; --line: #2A313B;
+  --coral: #FF6A72; --teal: #3EC2C4; --amber: #F0B43A;
+  --coral-soft: #3A1E22; --teal-soft: #12302F; --amber-soft: #352B14; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 64px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 900; font-stretch: 85%; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.5rem, 3.6vw, 2.1rem); font-weight: 800; font-stretch: 90%; }
+h3 { font-size: 1.1rem; font-weight: 700; }
+p { margin: 0; max-width: 66ch; }
+.eyebrow { font: 500 0.75rem/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.section { display: grid; gap: 20px; min-width: 0; }
+.lede { font-size: 1.12rem; color: var(--muted); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+code { font-family: var(--mono); font-size: 0.9em; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+/* hero */
+.hero { display: grid; gap: 16px; }
+.stats { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font: 800 1.8rem/1 var(--display); font-stretch: 85%; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 0.85rem; color: var(--muted); }
+
+/* who-does-what chips */
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 0.72rem/1 var(--mono); letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.script { color: var(--teal); background: var(--teal-soft); }
+.chip.claude { color: var(--coral); background: var(--coral-soft); }
+.chip.qa { color: var(--amber); background: var(--amber-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 0.9rem; color: var(--muted); }
+
+/* pipeline */
+.pipe { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: step; }
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 16px; position: relative; padding-bottom: 22px; }
+.step::before { counter-increment: step; content: counter(step, decimal-leading-zero); font: 500 0.85rem/44px var(--mono);
+  text-align: center; width: 44px; height: 44px; border-radius: 50%; background: var(--surface); border: 1px solid var(--line);
+  position: relative; z-index: 1; }
+.step::after { content: ""; position: absolute; left: 21.5px; top: 44px; bottom: 0; width: 1px; background: var(--line); }
+.step:last-child::after { display: none; }
+.step.loop::before { border-color: var(--amber); color: var(--amber); }
+.step-body { display: grid; gap: 6px; min-width: 0; padding-top: 9px; }
+.step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.step-body p { color: var(--muted); font-size: 0.95rem; }
+.step-body .facts { font: 400 0.82rem/1.5 var(--mono); color: var(--ink); }
+.back { font: 500 0.82rem/1.4 var(--mono); color: var(--amber); }
+
+/* story timeline */
+.scroll { overflow-x: auto; min-width: 0; }
+.tl { min-width: 720px; display: grid; gap: 10px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.tl-row { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; }
+.tl-label { font: 500 0.78rem/1.3 var(--mono); color: var(--muted); }
+.bar { position: relative; height: 34px; background: var(--bg); border-radius: 4px; border: 1px solid var(--line); }
+.seg { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; background: var(--coral); }
+.seg.kept { background: var(--coral); }
+.clip .seg { display: flex; align-items: center; justify-content: center; font: 500 0.72rem/1 var(--mono); color: #fff; overflow: hidden; }
+.ticks { position: relative; height: 18px; font: 400 0.7rem/1 var(--mono); color: var(--muted); }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ticks span:first-child { transform: none; }
+.ticks span:last-child { transform: translateX(-100%); }
+.fxrow { position: relative; height: 30px; }
+.fx { position: absolute; top: 0; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px;
+  font: 500 0.66rem/1.1 var(--mono); color: var(--ink); white-space: nowrap; }
+.fx i { width: 2px; height: 10px; background: var(--ink); display: block; }
+.fx.red i { background: var(--coral); }
+.span-fx { position: absolute; top: 4px; height: 8px; border-radius: 2px; background: var(--amber); opacity: 0.85; }
+.beats { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.beat { display: grid; gap: 6px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; align-content: start; }
+.beat .t { font: 500 0.72rem/1 var(--mono); color: var(--coral); letter-spacing: 0.04em; }
+.beat b { font-family: var(--display); font-weight: 700; font-size: 1rem; }
+.beat q { font-size: 0.9rem; color: var(--muted); quotes: "“" "”"; }
+
+/* frames */
+.frames { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px; }
+.frame-card { display: grid; grid-template-columns: minmax(150px, 210px) 1fr; gap: 20px; align-items: start; min-width: 0; }
+@media (max-width: 520px) { .frame-card { grid-template-columns: 1fr; justify-items: start; } .frame { width: 220px; } }
+.frame { position: relative; aspect-ratio: 9 / 16; width: 100%; max-width: 100%; border-radius: 14px; overflow: hidden;
+  background: var(--frame-dark); box-shadow: 0 0 0 1px var(--line); }
+.zone { position: absolute; left: 0; right: 0; }
+.pin { position: absolute; width: 20px; height: 20px; border-radius: 50%; background: var(--frame-white); color: #111;
+  font: 600 0.68rem/20px var(--mono); text-align: center; box-shadow: 0 0 0 2px var(--coral); z-index: 3; }
+.face { top: 0; height: 40%; background: radial-gradient(circle at 50% 120%, #3c332d 0 40%, var(--frame-face) 41%); }
+.face .head { position: absolute; left: 50%; top: 22%; width: 34%; aspect-ratio: 1; border-radius: 50%; transform: translateX(-50%); background: #d9b49a; }
+.face .phones { position: absolute; left: 50%; top: 18%; width: 46%; aspect-ratio: 1; transform: translateX(-50%); border: 6px solid #d8343f; border-bottom-color: transparent; border-radius: 50%; }
+.game-sea { top: 40%; height: 60%; background: linear-gradient(180deg, var(--frame-sea) 0 55%, var(--frame-sea2) 55%); }
+.game-sea .boat { position: absolute; left: 30%; top: 48%; width: 38%; height: 9%; background: #e9e3d6; clip-path: polygon(0 0, 100% 0, 86% 100%, 10% 100%); }
+.hook-bold { position: absolute; left: 6%; right: 6%; text-align: center; font: 900 clamp(0.62rem, 2.6vw, 0.9rem)/1.12 var(--hook);
+  color: var(--frame-white); text-transform: uppercase; text-shadow: 0 0 3px #000, 0 2px 0 #000; z-index: 2; }
+.hook-bold em { font-style: normal; color: var(--frame-yellow); }
+.hook-box { position: absolute; left: 7%; right: 7%; padding: 5% 4%; border-radius: 8px; background: var(--frame-white); color: #1d1d1f;
+  text-align: center; font: 700 clamp(0.6rem, 2.4vw, 0.82rem)/1.2 var(--body); z-index: 2; }
+.hook-box em { font-style: normal; color: var(--frame-blue); }
+.cap-boxed { position: absolute; left: 50%; transform: translateX(-50%); background: #000; color: var(--frame-white);
+  font: 400 clamp(0.9rem, 3.6vw, 1.25rem)/1.05 var(--cap); padding: 4px 8px; white-space: nowrap; z-index: 2; }
+.cap-boxed em { font-style: normal; color: var(--frame-yellow); }
+.cap-bold { position: absolute; left: 6%; right: 6%; text-align: center; font: 900 clamp(0.6rem, 2.5vw, 0.86rem)/1.15 var(--hook);
+  color: var(--frame-white); text-transform: uppercase; text-shadow: 0 0 3px #000, 0 2px 0 #000; z-index: 2; }
+.cap-bold em { font-style: normal; color: var(--frame-yellow); }
+.blur-bg { inset: 0; background: radial-gradient(circle at 30% 30%, #8a7358, transparent 60%), radial-gradient(circle at 70% 75%, #4a5a3e, transparent 55%), var(--frame-room2);
+  filter: blur(6px) brightness(0.82); transform: scale(1.1); }
+.band { top: 34.2%; height: 31.7%; background: linear-gradient(180deg, var(--frame-room) 0 70%, #5b4a37 70%); }
+.band .phone { position: absolute; right: 14%; top: 14%; width: 22%; height: 78%; border-radius: 6px; background: #1d2228; border: 2px solid #c9ced6; }
+.band .cam { position: absolute; left: 3%; top: 6%; width: 21%; height: 30%; background: var(--frame-face); border: 1px solid #ffffff55; }
+.spec { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.spec li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; font-size: 0.9rem; }
+.spec .n { width: 20px; height: 20px; border-radius: 50%; background: var(--coral); color: #fff; font: 600 0.68rem/20px var(--mono); text-align: center; }
+.spec b { font-weight: 600; }
+.spec small { display: block; color: var(--muted); font: 400 0.78rem/1.45 var(--mono); }
+.frame-card h3 { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+.frame-card h3 span { font: 500 0.8rem/1 var(--mono); color: var(--muted); }
+
+/* toolkit + qa */
+.kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.kit > div { background: var(--surface); padding: 16px; display: grid; gap: 6px; align-content: start; }
+.kit b { font-family: var(--display); font-weight: 700; }
+.kit p { font-size: 0.9rem; color: var(--muted); }
+.kit .mono { font-size: 0.78rem; color: var(--ink); }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 600px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.72rem/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+td:first-child { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; }
+.tbl { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.foot { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <span class="eyebrow">Davy Jones · GTA 6 · 18/11/2026</span>
+  <h1>Anatomia de um corte</h1>
+  <p class="lede">Como oito minutos de live viraram um Short de 44 segundos: a jornada de barco até o limite do mapa. A parte mecânica é script; a escolha do que contar é do Claude; um agente separado reprova o que não está bom.</p>
+  <div class="stats">
+    <div class="stat"><b class="mono">24</b><span>blocos de 30 min capturados</span></div>
+    <div class="stat"><b class="mono">27</b><span>renders feitos</span></div>
+    <div class="stat"><b class="mono">10</b><span>aprovados no QA</span></div>
+    <div class="stat"><b class="mono">0</b><span>publicados (só você publica)</span></div>
+  </div>
+</header>
+
+<section class="section" aria-labelledby="caminho">
+  <span class="eyebrow">O caminho</span>
+  <h2 id="caminho">Da live ao MP4, em dez etapas</h2>
+  <div class="legend">
+    <span class="chip script">Script</span> determinístico, sem IA
+    <span class="chip claude">Claude</span> julgamento editorial
+    <span class="chip qa">Agente QA</span> revisão independente
+  </div>
+  <ol class="pipe">
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Captura do VOD da Kick</h3><span class="chip script">Script</span></div>
+      <p>O YouTube não deixa baixar um trecho da live enquanto ela está no ar, então o histórico vem da mesma transmissão na Kick. Os segmentos de 10 s são baixados em paralelo e juntados sem recodificar.</p>
+      <span class="facts">6 conexões · ~5x o tempo real · 1080p60 H.264 + AAC · blocos de 1800 s a partir das 07:59</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Transcrição</h3><span class="chip script">Script</span></div>
+      <p>Parakeet v3 no processador, uma palavra por linha com o segundo em que começa e termina. Uma fila só, um bloco por vez.</p>
+      <span class="facts">{"w": "bonito.", "s": 769.01, "e": 769.47} · ~15 a 20 min por bloco de 30 min</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Sinais automáticos</h3><span class="chip script">Script</span></div>
+      <p>Mede volume, saltos repentinos, palavras de empolgação e ritmo de fala, e lista candidatos com folhas de quadros para olhar.</p>
+      <span class="facts">candidates.md · review/cand_NN.jpg</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Sinal do público</h3><span class="chip script">Script</span></div>
+      <p>Os clipes que o público fez na Kick dizem onde algo aconteceu. Horário do clipe menos o início da live vira o segundo exato no bloco.</p>
+      <span class="facts">"DavyJones no fim do mundo GTA6" · 12:49:45 UTC − 09:32:24 − 180 s ≈ segundo 11661</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Curadoria</h3><span class="chip claude">Claude</span></div>
+      <p>Lê a transcrição em volta de cada sinal, olha os quadros e só aceita o momento se der para dizer o que aconteceu, por que ele reagiu e por que alguém de fora se importa. Momentos sem grito também entram.</p>
+      <span class="facts">a jornada não tinha pico de volume: foi achada lendo "o que tem no fim do mundo" e a enquete do chat</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Receita do vídeo</h3><span class="chip claude">Claude</span></div>
+      <p>Um arquivo <code>picks.json</code> com os trechos em ordem, o layout, o recorte da facecam, os ganchos, os títulos, os rótulos, os efeitos e a música, cada um no segundo certo.</p>
+      <span class="facts">"segments": 7 trechos · "layout": split · "face": [0.016, 0.022, 0.212, 0.214]</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Checagem e simulação</h3><span class="chip script">Script</span></div>
+      <p>Reprova gancho fraco, abertura com enchimento, trecho já usado em outro vídeo e silêncio longo. Ordena os ganchos pelo efeito medido em 3.481 Shorts de games.</p>
+      <span class="facts">"Davy Jones NÃO esperava…" · negação + nome do streamer · 1,47x</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Render</h3><span class="chip script">Script</span></div>
+      <p>FFmpeg monta o vertical, desenha legendas e gancho como imagens, aplica zoom, flash e impacto sonoro, nivela o volume e codifica.</p>
+      <span class="facts">1080×1920 · 30 fps · libx264 veryfast CRF 20 · loudnorm −14 LUFS · ~1 min por vídeo</span>
+    </div></li>
+    <li class="step loop"><div class="step-body">
+      <div class="step-head"><h3>Controle de qualidade</h3><span class="chip qa">Agente QA</span></div>
+      <p>Um agente separado extrai quadros, procura tela preta e imagem congelada, mede o volume, lê cada legenda e confere se a imagem entrega o que o título promete.</p>
+      <span class="back">reprovou → volta para a etapa 06 com o segundo exato a corrigir</span>
+    </div></li>
+    <li class="step"><div class="step-body">
+      <div class="step-head"><h3>Entrega</h3><span class="chip script">Script</span></div>
+      <p>MP4, título, descrição com crédito e link, hashtags. As versões reprovadas ficam guardadas, nunca apagadas.</p>
+      <span class="facts">D:\GTA6-BR\exports\gta-br\2026-11-18\ · D:\GTA6-BR\variantes\</span>
+    </div></li>
+  </ol>
+</section>
+
+<section class="section" aria-labelledby="receita">
+  <span class="eyebrow">A receita da jornada</span>
+  <h2 id="receita">Oito minutos de live, 44 segundos de vídeo</h2>
+  <p>Em cima, a live entre 09:35:21 e 09:43:29 (segundos 10977 a 11465). Em vermelho, os sete trechos que ficaram. Embaixo, os mesmos trechos colados, e os efeitos no segundo em que entram. Tudo em escala.</p>
+  <div class="scroll">
+    <div class="tl" role="img" aria-label="Linha do tempo: 7 trechos de uma janela de 488 segundos de live viram um vídeo de 44,3 segundos">
+      <div class="tl-row"><span class="tl-label">live · 488 s</span>
+        <div class="bar">
+          <div class="seg" style="left:0%;width:1.22%"></div>
+          <div class="seg" style="left:7.45%;width:0.69%"></div>
+          <div class="seg" style="left:59.61%;width:1.94%"></div>
+          <div class="seg" style="left:65.49%;width:0.72%"></div>
+          <div class="seg" style="left:84.05%;width:1.89%"></div>
+          <div class="seg" style="left:87.58%;width:1.80%"></div>
+          <div class="seg" style="left:99.17%;width:0.83%"></div>
+        </div></div>
+      <div class="tl-row"><span></span>
+        <div class="ticks"><span style="left:0%">09:35:21</span><span style="left:50%">09:39:25</span><span style="left:100%">09:43:29</span></div></div>
+      <div class="tl-row"><span class="tl-label">vídeo · 44,3 s</span>
+        <div class="bar clip">
+          <div class="seg" style="left:0%;width:13.4%">1</div>
+          <div class="seg" style="left:13.4%;width:7.6%">2</div>
+          <div class="seg" style="left:21.0%;width:21.3%">3</div>
+          <div class="seg" style="left:42.3%;width:7.9%">4</div>
+          <div class="seg" style="left:50.2%;width:20.8%">5</div>
+          <div class="seg" style="left:71.0%;width:19.9%">6</div>
+          <div class="seg" style="left:90.9%;width:9.1%">7</div>
+        </div></div>
+      <div class="tl-row"><span class="tl-label">efeitos</span>
+        <div class="fxrow">
+          <div class="fx" style="left:21.2%"><i></i>flash</div>
+          <div class="fx" style="left:61.2%"><i></i>zoom</div>
+          <div class="span-fx" style="left:74.5%;width:13.5%" title="música de suspense 33–39 s"></div>
+          <div class="fx red" style="left:88.4%"><i></i>boom</div>
+        </div></div>
+      <div class="tl-row"><span></span>
+        <div class="ticks"><span style="left:0%">0 s</span><span style="left:74.5%">música 33–39 s</span><span style="left:100%">44,3 s</span></div></div>
+    </div>
+  </div>
+  <div class="beats">
+    <div class="beat"><span class="t">1 · 0,0 s · objetivo</span><b>"Vou ver o fim do mundo"</b><q>Primeira vez. E eu vou ver o fim do mundo no GTA VI. Momento histórico aqui com vocês.</q></div>
+    <div class="beat"><span class="t">2 · 5,9 s · percurso</span><b>A aproximação</b><q>Estou chegando no que possivelmente é o fim do mundo.</q></div>
+    <div class="beat"><span class="t">3 · 9,3 s · chegada</span><b>Flash branco na revelação</b><q>Cheguei no limite que o mapa deixava. A partir daqui eu não sei mais o que tem.</q></div>
+    <div class="beat"><span class="t">4 · 18,8 s · prova</span><b>O mapa confirma</b><q>Olha onde a gente já tá. E o meu cursor não vai mais.</q></div>
+    <div class="beat"><span class="t">5 · 22,2 s · virada</span><b>Zoom no grito</b><q>O motor quebra. Vai explodir, vai explodir. Sai do carro, Jason. Pula.</q></div>
+    <div class="beat"><span class="t">6 · 31,5 s · tensão</span><b>Rótulo *SEM SAÍDA*, música, boom</b><q>Eu tô tomando dano, à toa! Nem o tubarão pra aparecer.</q></div>
+    <div class="beat"><span class="t">7 · 40,3 s · conclusão</span><b>Fecha no rosto</b><q>Pô, mas o fim do mundo foi broxante, tá? Eu esperava mais.</q></div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="designs">
+  <span class="eyebrow">Os designs</span>
+  <h2 id="designs">Dois layouts, escolhidos pelo momento</h2>
+  <p>Quando o ponto é a reação dele, a facecam ganha a parte de cima da tela. Quando o ponto é o que aparece no jogo (um app, um menu de cores, o fundo do mar), o gameplay vai inteiro, sem cortar nada.</p>
+  <div class="frames">
+    <div class="frame-card">
+      <h3>A · Reação <span>layout split</span></h3>
+      <div class="frame" role="img" aria-label="Esboço do layout split: facecam em cima, gancho na emenda, gameplay embaixo com legenda">
+        <div class="zone face"><div class="phones"></div><div class="head"></div></div>
+        <div class="zone game-sea"><div class="boat"></div></div>
+        <div class="hook-bold" style="top:31%">Davy Jones <em>não</em> esperava isso do mapa</div>
+        <div class="cap-boxed" style="top:66%"><em>CHEGUEI</em> NO LIMITE</div>
+        <span class="pin" style="left:6%;top:5%">1</span>
+        <span class="pin" style="right:6%;top:31%">2</span>
+        <span class="pin" style="left:6%;top:47%">3</span>
+        <span class="pin" style="right:6%;top:66%">4</span>
+      </div>
+      <ul class="spec">
+        <li><span class="n">1</span><div><b>Facecam</b><small>recorte da fonte em [x, y, w, h] · ampliado para 1080×768 (40% de cima)</small></div></li>
+        <li><span class="n">2</span><div><b>Gancho</b><small>Montserrat Black, palavra-chave marcada com *asteriscos* · até ~28 caracteres</small></div></li>
+        <li><span class="n">3</span><div><b>Gameplay</b><small>altura 1152 · recorte de 1080 de largura, posição horizontal por game_x</small></div></li>
+        <li><span class="n">4</span><div><b>Legenda</b><small>palavra por palavra, sincronizada pela transcrição · palavrão mascarado (P*TA)</small></div></li>
+      </ul>
+    </div>
+    <div class="frame-card">
+      <h3>B · Descoberta <span>layout fit</span></h3>
+      <div class="frame" role="img" aria-label="Esboço do layout fit: fundo desfocado, gameplay inteiro no meio, gancho em cima e legenda embaixo">
+        <div class="zone blur-bg"></div>
+        <div class="zone band"><div class="cam"></div><div class="phone"></div></div>
+        <div class="hook-bold" style="top:16%">Eu quando acho a <em>academia</em></div>
+        <div class="cap-bold" style="top:72%">Aplicativo fitness <em>aqui</em></div>
+        <span class="pin" style="left:6%;top:4%">1</span>
+        <span class="pin" style="right:6%;top:16%">2</span>
+        <span class="pin" style="left:6%;top:44%">3</span>
+        <span class="pin" style="right:6%;top:72%">4</span>
+      </div>
+      <ul class="spec">
+        <li><span class="n">1</span><div><b>Fundo</b><small>a própria cena ampliada, desfoque gaussiano σ40, brilho −18%</small></div></li>
+        <li><span class="n">2</span><div><b>Gancho</b><small>mesmo banner do modelo A, acima do gameplay</small></div></li>
+        <li><span class="n">3</span><div><b>Gameplay inteiro</b><small>1080×608 no centro · a facecam original da live fica no canto, como na transmissão</small></div></li>
+        <li><span class="n">4</span><div><b>Legenda</b><small>estilo bold, sem caixa · palavra-chave em amarelo</small></div></li>
+      </ul>
+    </div>
+  </div>
+  <div class="frames">
+    <div class="frame-card">
+      <h3>Variação de gancho <span>hook_style box</span></h3>
+      <div class="frame" role="img" aria-label="Esboço do gancho em caixa branca, usado em comédia">
+        <div class="zone face"><div class="phones"></div><div class="head"></div></div>
+        <div class="zone" style="top:40%;height:60%;background:linear-gradient(180deg,#5c6b55,#2f3a2c)"></div>
+        <div class="hook-box" style="top:34%">Eu quando vou só <em>CONSERTAR</em> a pia</div>
+        <div class="cap-boxed" style="top:68%"><em>NÃO</em> FAREI!</div>
+      </div>
+      <ul class="spec">
+        <li><span class="n">·</span><div><b>Caixa branca</b><small>para comédia e situação identificável (o encanador)</small></div></li>
+        <li><span class="n">·</span><div><b>Rótulos de ação</b><small>*SEM SAÍDA*, *QUARTO PRONTO*: só onde ninguém fala</small></div></li>
+        <li><span class="n">·</span><div><b>Sem gancho</b><small>1 em 3 vídeos sai sem banner para comparar desempenho; história e abertura ficam fora do sorteio</small></div></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="kit">
+  <span class="eyebrow">Caixa de ferramentas</span>
+  <h2 id="kit">O que cada efeito faz, e quando entra</h2>
+  <div class="kit">
+    <div><b>Flash</b><p>Branco na revelação, vermelho no perigo ou na morte. Uma fração de segundo.</p><span class="mono">jornada: branco 9,4 s · vermelho 39,15 s</span></div>
+    <div><b>Zoom</b><p>Aproximação suave numa fala gritada. Recorte sub-pixel, sem tremido.</p><span class="mono">"vai explodir" · 27,1 s</span></div>
+    <div><b>Impacto sonoro</b><p>Um boom no desfecho ou na maior reação. No máximo um a cada ~4 s.</p><span class="mono">afundando · 39,15 s</span></div>
+    <div><b>Música</b><p>Só em trecho sem fala de 2 s ou mais, baixa sob a voz.</p><span class="mono">suspense · 33–39 s</span></div>
+    <div><b>Cortes</b><p>Sempre em fronteira de palavra, conferida pelos tempos da transcrição. Silêncio morto sai.</p><span class="mono">7 trechos, 0 frases cortadas</span></div>
+    <div><b>Volume</b><p>Nivelado para o padrão das plataformas, sem estourar.</p><span class="mono">−14 LUFS · pico −1,5 dBTP</span></div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="qa">
+  <span class="eyebrow">O que o QA pegou</span>
+  <h2 id="qa">27 renders para 10 vídeos aprovados</h2>
+  <p>Cada reprovação virou uma regra no roteiro de produção, para não se repetir.</p>
+  <div class="scroll tbl">
+    <table>
+      <thead><tr><th>Vídeo</th><th>Problema</th><th>Correção</th></tr></thead>
+      <tbody>
+        <tr><td>abertura</td><td>4 s finais numa tela de menu roxa, sem a arte prometida</td><td>terminar no logo da Rockstar</td></tr>
+        <tr><td>abertura</td><td>gancho cortado no banner ("…FINALMENTE", sem "abre")</td><td>gancho com até ~28 caracteres</td></tr>
+        <tr><td>encanador</td><td>começava dentro da palavra "Unless" e terminava numa personagem de biquíni</td><td>início em "É logo de cara", fim antes do quadro sugestivo</td></tr>
+        <tr><td>primeira morte</td><td>descrição dizia "rouba o carro"; na tela ele tenta roubar uma viatura</td><td>"tenta roubar uma viatura"</td></tr>
+        <tr><td>pintura</td><td>o último quadro já tinha trocado para uma garagem</td><td>fim em 768,7 s, no quarto verde pronto</td></tr>
+        <tr><td>mapa</td><td>prometia o mapa inteiro, que nunca aparece inteiro</td><td>"Você tem noção do tamanho?"</td></tr>
+        <tr><td>jornada</td><td>caiu no sorteio sem gancho</td><td>campo novo "no_hook": false para vídeos que precisam do gancho</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<p class="foot">Fonte de todos os vídeos: live de Davy Jones de 18/11/2026 (Kick davyjones, simultânea com o YouTube @Gameplayrj). Créditos e link vão na descrição de cada vídeo. Nada foi publicado.</p>
+
+</div>

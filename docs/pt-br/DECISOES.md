@@ -1,6 +1,6 @@
 # Decisões técnicas e estado de validação
 
-Atualizado em 18/11/2026.
+Atualizado em 18/11/2026 (fim do dia, notebook).
 
 ## O que foi implementado e o que foi testado
 
@@ -17,6 +17,11 @@ Atualizado em 18/11/2026.
 | `/clip-br`: modo manual e automático, dois modelos de edição, textos PT-BR | Sim (roteiro) | **Falta a primeira produção real** |
 | Transcrição em português (Parakeet v3) | Já existia | **Falta testar com áudio real em PT-BR** |
 | Rotina na nuvem com o PC desligado | Documentado (`NUVEM.md`) | **Não testado** |
+| Motor no Windows nativo (travas, PIDs, parada graciosa, hooks) | Sim (18/11) | Suíte verde no Windows (196 testes); gravação ao vivo testada só pelos testes com ffmpeg real. Linux: pelo CI após o push |
+| VOD da Kick por segmentos HLS (`vods.py`), `vod_from`, `--no-analyze` | Sim (18/11) | **Real:** 26 blocos de 30 min do Davy Jones, 1080p60 sem recodificar |
+| Primeira produção (`/clip-br` com curadoria, render, QA) | Sim (18/11) | **Real:** 10 vídeos aprovados pelo `qa-video` (27 renders). Telegram ainda não |
+| Transcrição em português (Parakeet v3) | Já existia | **Real:** 26 blocos em PT-BR; legendas conferidas pelo QA |
+| Importação de MP4 local | **Não** | Pendente (OPERACOES-2026-11-18.md) |
 
 A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de desenvolvimento) passa no PC (18/11, nenhum pulado) e no CI do GitHub (2 pulados lá, por falta de yt-dlp). Os testes que dependem de rede ou GPU são simulados.
 
@@ -41,6 +46,10 @@ A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de des
 15. **Captura separada da análise (18/11/2026):** `vods fetch --no-analyze` em loop e uma fila que transcreve um bloco por vez (`scripts/operacao.sh`). A captura nunca espera a transcrição.
 16. **Mídia no D: por junções (18/11/2026):** `jobs/` e `exports/` apontam para `D:\GTA6-BR\` (`mklink /J`, sem admin). O código não muda e o C: (pouco espaço, paginação do Windows) fica livre. As pastas conceituais 01–07 são mapeadas sobre a estrutura existente, sem cópias ([OPERACAO.md](OPERACAO.md)).
 17. **Modelo Parakeet baixado em partes (18/11/2026):** o download do Hugging Face por uma conexão travou (~0,8 MB/s); baixamos os 4 arquivos com `curl` em 8 faixas paralelas direto no cache do Hugging Face e conferimos o SHA-256. Sem mudança de código.
+
+18. **Três operações separadas (18/11/2026):** Davy Jones na produção (pipeline completo); Paulinho o Loko e Alanzoka só coleta, em `D:\GTA6-BR\COLETA\`, fora do `state/` e do `jobs/` do projeto. Assim, uma coleta sem autorização confirmada nunca entra na produção por engano. Resumo em [OPERACOES-2026-11-18.md](OPERACOES-2026-11-18.md).
+19. **Scripts de coleta preservados como estão (18/11/2026):** `scripts/coleta/` guarda os scripts da operação 03 (Twitch por segmentos fMP4, referências do YouTube, catálogo de clipes), só com o ffmpeg vindo do PATH. Não foram integrados ao `clipper` nem testados; a importação de MP4 local e a Twitch por segmentos no `vods.py` ficam como trabalho planejado.
+20. **Autoria dos commits do notebook (18/11/2026):** o git do notebook tem identidade pessoal. Seguindo a decisão 11, os commits deste branch são publicados como `Claude <noreply@anthropic.com>`; os 8 commits locais do dia foram reescritos com essa autoria antes do primeiro push, quando ainda não estavam em nenhum outro lugar.
 
 ## Repositórios avaliados (resumo)
 

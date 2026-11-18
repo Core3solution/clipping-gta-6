@@ -2,48 +2,41 @@
 
 Atualize ao fim de cada sessão de desenvolvimento, em poucas linhas. O hook de início de sessão mostra a seção "Próximos passos".
 
-## Estado atual (18/11/2026)
+## Estado atual (18/11/2026, 17h30, fim do dia no notebook)
 
-- Branch `ptbr-operacao-lancamento`: perfil gta-br, PT-BR, Telegram, VODs, NVENC, zoom suave, `/clip-br`, estrutura de desenvolvimento (skills, agentes, hooks, regras).
-- PC instalado (WSL2, Ubuntu 26.04): `.venv` com `uv sync --locked --python 3.12`; yt-dlp, deno, uv e RTK (oss) em `~/.local/bin`; modelo Parakeet v3 baixado. Hooks usam o `.venv`.
-- Suíte verde no PC (187 testes, nenhum pulado) e no CI do GitHub (`5f20eba`; 2 pulados lá, sem yt-dlp). O CI agora instala ffmpeg (os testes de zoom e de VODs do gta-br precisam dele). NVENC real confirmado na RTX 3060. YouTube e Twitch acessíveis pelo yt-dlp (sem download).
-- Branch no GitHub (`origin/ptbr-operacao-lancamento`), sincronizada; `main` intocada (`bde4393`). Nada de PR aberto.
-- Skills (19), `/clip-br` e os 4 subagentes já carregam no Claude Code (subagentes só após recarregar a sessão).
-- **Não feito, por decisão do usuário (18/11):** Telegram, primeira produção, nuvem, modo lançamento. Nenhuma implementação nova foi iniciada.
-- **Notebook Windows (18/11, nativo, sem WSL/admin):** i7-1360P, 16 GB, Intel Iris Xe (sem NVENC; QSV existe mas não ganha do libx264). Em `~/.local/bin` (no PATH do usuário): ffmpeg/ffprobe 8.1 (BtbN), uv 0.13.9, yt-dlp e deno (`uv tool`). `.venv` com Python 3.12 pelo `uv.lock`. Hooks agora rodam no Windows (antes o `python3` era o atalho da Store e nenhum hook executava). Suíte no Windows: estrutura verde; **motor com 31 falhas** (`fcntl` em `live.py`, sinais, `/proc`, `os.kill(pid,0)` que mata o processo no Windows, agendador só launchd/systemd). Diagnóstico completo aguardando aprovação para o porte.
-- Influenciadores em avaliação (autorização de uso pendente; só metadados): Davy Jones (YouTube @Gameplayrj, kick.com/davyjones), Alanzoka (twitch.tv/alanzoka), Tonyboy (YouTube @tonyboyoficial, live com restrição de idade). Radar: categoria GTA VI da Kick.
+- Branch `ptbr-operacao-lancamento` no GitHub; `main` intocada (`bde4393`). Nada de PR aberto.
+- **Primeiro dia de produção feito no notebook Windows** (nativo, sem WSL nem admin). Resumo das 3 operações, inventário de mídia e pendências: [docs/pt-br/OPERACOES-2026-11-18.md](../pt-br/OPERACOES-2026-11-18.md).
+- **Davy Jones:** 26 blocos de 30 min (07h59–17h13) capturados pela Kick e transcritos; **10 vídeos aprovados no QA**, nada publicado e nada enviado ao Telegram. Curadoria feita até o bloco 025020; os blocos 026820–037620 estão transcritos e sem curadoria.
+- **Paulinho o Loko:** live inteira do YouTube baixada (7h45). Permissão de uso **não confirmada**.
+- **Alanzoka:** 3 h de GTA 6 baixadas do VOD da Twitch; o resto é retomável com `scripts/coleta/coleta_twitch_vod.py`.
+- **Tonyboy:** live com restrição de idade; o operador grava pelo OBS.
+- A mídia (~53 GB) ficou no D: do notebook e vai à parte. Pelo GitHub vão só o código, a documentação e o `state/vods.json`.
+- Motor portado para Windows (suíte verde no Windows, 196 testes). Linux não testado no notebook: conferir o CI depois do push.
+- PC (WSL2, Ubuntu 26.04) continua como antes: `.venv` com `uv sync --locked --python 3.12`; yt-dlp, deno, uv e RTK em `~/.local/bin`; NVENC na RTX 3060.
 
 ## Pendências que dependem do usuário
 
-- Nomes e plataformas (Twitch/YouTube/Kick) dos **3 influenciadores autorizados**; hoje `profiles/gta-br/live.yaml` está vazio e `creators.yaml` só tem a Rockstar.
+- Confirmar a permissão do Paulinho o Loko antes de publicar qualquer corte dele.
+- Copiar a mídia do D: do notebook para o PC (inventário no OPERACOES-2026-11-18.md) e escolher a nuvem de armazenamento (Drive da CORE 3 ou outra gratuita).
 - Bot do Telegram: criar no @BotFather, `cp .env.example .env` e preencher o token (o Claude não lê nem edita o `.env`).
-- Escolher o 1º vídeo (link de autorizado; o Launch Trailer oficial `youtu.be/rz1B4B2yBZY` é a opção sem risco de direitos).
-- Opcional: Demucs (separação de voz na GPU, ~2–3 GB); sem ele, `separate_voices: false`. Memória do WSL é 7,7 GB (`.wslconfig` se ficar lento).
-
-## Operação de 18/11 (notebook, tarde)
-
-- Motor portado para Windows (suíte verde no Windows; Linux não verificado aqui, falta o CI após push). Commits locais `1df3396`, `c003fff`, `35422e0`, `9829f96`.
-- Davy Jones: histórico pela Kick desde 07h59 em blocos de 30 min (`jobs/live-vod-davyjones-kick-kick-138532295-*`, no D:), captura e análise em filas (`docs/pt-br/OPERACAO.md`). Catálogo e sinais do público em `exports/gta-br/2026-11-18/momentos.md`.
-- Tonyboy: gravação manual (OBS) pelo operador; live com restrição de idade, sem cookies no notebook. Alanzoka: à noite (Twitch, `live add twitch:alanzoka` + `vod_from`).
-- **Produção (17h): 10 vídeos do Davy Jones aprovados no QA** em `D:\GTA6-BR\exports\gta-br\2026-11-18\` (lista e catálogo em `momentos.md` dessa pasta; versões reprovadas em `D:\GTA6-BR\variantes\`). Destaque: a jornada até o fim do mapa (video 6, story cut de 44 s). Nada enviado ao Telegram (sem bot configurado) e nada publicado.
-- Curadoria feita até o bloco 025020 (até ~14h da live). Os blocos seguintes estão capturados/analisados conforme as filas avançam: próxima rodada começa no 026820.
-- Atenção: duas filas de análise ao mesmo tempo esgotam a RAM (16 GB, ~3 GB livres com o VS Code aberto) e incham o `pagefile.sys` no C:. Uma fila só.
+- Tonyboy: autenticação do YouTube só num dispositivo pessoal, se for necessária.
+- Revisar e aprovar os 10 vídeos do Davy Jones antes de publicar (em `exports/gta-br/2026-11-18/`).
 
 ## Próximos passos
 
-0. Ao chegar em casa: push (com aprovação) para o CI validar Linux; sincronizar `D:\GTA6-BR` com a nuvem escolhida; compilação de primeiras reações (Davy + Tonyboy + Alanzoka) com `clipper find`.
-1. Telegram: `telegram chat-id` → `TELEGRAM_CHAT_ID` → `telegram notify "teste"`.
-2. Primeiro vídeo: `/clip-br <link>`; avaliar a edição com o agente `qa-video` e com o usuário.
-3. Nuvem com o PC desligado (docs/pt-br/NUVEM.md): 1 bloco de VOD, depois rotina de hora em hora.
-4. Modo lançamento e primeiras reações dos 3 autorizados: `brainstorming` curto → `writing-plans` → TDD.
-5. Depois: legendas animadas e callouts do Editonny, SFX do woven-sfx, sinal de chat da Twitch.
+1. Conferir o CI do push de 18/11 (Linux) e copiar `D:\GTA6-BR` para o PC (`jobs/` e `exports/` na raiz do projeto).
+2. Implementar a importação de MP4 local em blocos de 30 min (spec no OPERACOES-2026-11-18.md): destrava Paulinho, Alanzoka e Tonyboy.
+3. Curadoria dos blocos 026820–037620 do Davy Jones; retomar a captura (`sh scripts/operacao.sh captura`) se o VOD seguir disponível.
+4. Compilação das primeiras reações (âncora do Davy: live 5328–5342,6; depois Alanzoka e Tonyboy) com `clipper find`.
+5. Auditoria do Editonny e do vibe-coding-toolkit (lista no OPERACOES-2026-11-18.md); depois legendas animadas e callouts.
+6. Telegram, e depois a nuvem com o PC desligado (docs/pt-br/NUVEM.md).
 
-## Como operar o PC (WSL)
+## Como operar
 
-- Python: `.venv` (o hook põe no PATH); testes `.venv/bin/python -m unittest discover -s tests`. Se `rtk`/`uv`/`yt-dlp` não forem achados, reabra o VS Code (`~/.profile` põe `~/.local/bin` no PATH).
-- Push: `git -c credential.helper= -c "credential.helper=/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe" push origin ptbr-operacao-lancamento` (sempre com aprovação do usuário). O git do WSL não tem identidade: commits saem como `Claude <noreply@anthropic.com>`.
+- **PC (WSL):** testes `.venv/bin/python -m unittest discover -s tests`. Se `rtk`/`uv`/`yt-dlp` não forem achados, reabra o VS Code. Push: `git -c credential.helper= -c "credential.helper=/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe" push origin ptbr-operacao-lancamento` (sempre com aprovação). O git do WSL não tem identidade: commits saem como `Claude <noreply@anthropic.com>`.
+- **Notebook Windows:** testes `.venv/Scripts/python.exe -m unittest discover -s tests` (com `~/.local/bin` no PATH). Filas: [docs/pt-br/OPERACAO.md](../pt-br/OPERACAO.md). O git do notebook tem identidade pessoal configurada: commit com `git -c user.name=Claude -c user.email=noreply@anthropic.com commit ...` (decisão 11).
 - CI: `curl -s 'https://api.github.com/repos/Core3solution/clipping-gta-6/actions/runs?branch=ptbr-operacao-lancamento&per_page=1'`.
 
 ## Decisões recentes
 
-Ver `docs/pt-br/DECISOES.md` e `docs/pt-br/ECOSSISTEMA.md`.
+Ver `docs/pt-br/DECISOES.md` (13 a 20 são de 18/11, notebook) e `docs/pt-br/ECOSSISTEMA.md`.
