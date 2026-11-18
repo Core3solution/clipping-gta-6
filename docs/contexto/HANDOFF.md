@@ -7,7 +7,7 @@ Atualize ao fim de cada sessão de desenvolvimento, em poucas linhas. O hook de 
 - Branch `ptbr-operacao-lancamento`: perfil gta-br, PT-BR, Telegram, VODs, NVENC, zoom suave, `/clip-br`, estrutura de desenvolvimento (skills, agentes, hooks, regras).
 - PC instalado (WSL2, Ubuntu 26.04): `.venv` com `uv sync --locked --python 3.12`; yt-dlp, deno, uv e RTK (oss) em `~/.local/bin`; modelo Parakeet v3 baixado. Hooks usam o `.venv`.
 - Suíte verde no PC (187 testes, nenhum pulado). NVENC real confirmado na RTX 3060. YouTube e Twitch acessíveis pelo yt-dlp (sem download). Telegram e produção real ainda não testados.
-- Branch commitada localmente, **push pendente**: o GitHub recusou (403) a conta salva no Windows, sem escrita em `Core3solution/clipping-gta-6`. `main` intocada. Subagentes do projeto apareceram no Claude Code após recarregar.
+- Branch no GitHub (`origin/ptbr-operacao-lancamento`); `main` intocada. Push pelo WSL usa o Git Credential Manager do Windows (`git -c credential.helper=...` no comando). Subagentes do projeto apareceram no Claude Code após recarregar.
 - Sem `.env`, sem streamers cadastrados (`profiles/gta-br/live.yaml` vazio) e sem "modo lançamento" no código. Demucs não instalado (use `separate_voices: false`).
 - Shell: se `rtk`/`uv`/`yt-dlp` não forem achados, reabra o VS Code (`~/.profile` põe `~/.local/bin` no PATH).
 
