@@ -3,6 +3,7 @@
 re-reading the repo. Stdout becomes context. Kept under ~25 lines on purpose (context costs tokens every session)."""
 import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -22,7 +23,23 @@ def section(md, title, max_lines=8):
     return lines[:max_lines]
 
 
+def use_venv():
+    """On the PC the deps live in .venv (uv sync), not in system python3: put it first on PATH for this session's
+    Bash commands, so `python3 -m clipper` works as the commands and docs write it. The cloud has no .venv."""
+    venv, env_file = ROOT / ".venv" / "bin", os.environ.get("CLAUDE_ENV_FILE")
+    if not (venv.is_dir() and env_file):
+        return
+    line = f'export VIRTUAL_ENV={shlex.quote(str(venv.parent))} PATH={shlex.quote(str(venv))}:"$PATH"\n'
+    try:
+        if line not in (Path(env_file).read_text(encoding="utf-8") if Path(env_file).exists() else ""):
+            with open(env_file, "a", encoding="utf-8") as f:
+                f.write(line)
+    except OSError:
+        pass  # orientation below still prints
+
+
 def main():
+    use_venv()
     out = [f"Projeto: {ROOT.name}. Branch: {git('branch', '--show-current') or '?'}."]
     changed = [ln for ln in git("status", "--porcelain").splitlines() if ln.strip()]
     if changed:

@@ -12,7 +12,7 @@ Atualizado em 17/11/2026.
 | Crédito "Corte de <canal>" e link da Twitch com minuto (`?t=1h2m5s`) | Sim | Testes unitários |
 | Telegram: envio de MP4 com legenda, botões, descrição; aprovação; pedidos por link | Sim | Contra um servidor falso local. **Falta o teste real com o seu bot** |
 | VODs: encerrados e blocos novos de lives em andamento (Twitch), estado persistente, retentativas | Sim | Com yt-dlp simulado. **Falta o teste real contra a Twitch** |
-| NVENC automático na RTX 3060, `libx264 veryfast` na nuvem | Sim | Seleção testada. NVENC real só no seu PC |
+| NVENC automático na RTX 3060, `libx264 veryfast` na nuvem | Sim | Seleção testada. NVENC real confirmado no PC em 18/11 (encode 1080x1920 com `h264_nvenc`) |
 | Zoom suave com `perspective` (técnica do Editonny) | Sim | Renderizado com FFmpeg nesta sessão |
 | `/clip-br`: modo manual e automático, dois modelos de edição, textos PT-BR | Sim (roteiro) | **Falta a primeira produção real** |
 | Transcrição em português (Parakeet v3) | Já existia | **Falta testar com áudio real em PT-BR** |
@@ -30,6 +30,7 @@ A suíte completa (158 testes originais + 21 novos) passa. Os testes que depende
 6. **Telegram só por HTTPS da Bot API, sem bibliotecas novas:** nada de processo sempre ligado. Os toques e pedidos são lidos a cada rodada.
 7. **Nada é publicado automaticamente.** Aprovar só registra a decisão.
 8. **Editonny:** só técnicas isoladas, com crédito (`THIRD_PARTY.md`). O fluxo dele exige humano no meio e o caminho de HyperFrames precisa de Chromium e npm.
+9. **Ambiente do PC com uv (18/11/2026):** `.venv` por `uv sync --locked --python 3.12` (mesmo lockfile e Python do CI); yt-dlp e deno (runtime JS que o YouTube exige) como `uv tool` em `~/.local/bin`. O python3 do sistema não tem as dependências, então o hook de início de sessão põe o `.venv` no PATH do Claude (via `CLAUDE_ENV_FILE`) e o hook de Stop testa com `.venv/bin/python`. Na nuvem não há `.venv` e nada muda.
 
 ## Repositórios avaliados (resumo)
 

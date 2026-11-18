@@ -14,10 +14,19 @@ ffmpeg -hide_banner -encoders 2>/dev/null | grep -q h264_nvenc && echo "NVENC di
 command -v nvidia-smi >/dev/null && nvidia-smi -L || echo "GPU NVIDIA não visível (ok para testes)"
 
 say "Ambiente Python (.venv)"
-[ -d .venv ] || python3 -m venv .venv
-. .venv/bin/activate
-pip install --quiet --upgrade pip
-pip install --quiet -U yt-dlp "onnx-asr[cpu,hub]==0.12.0" numpy pillow pyyaml
+export PATH="$HOME/.local/bin:$PATH"
+if command -v uv >/dev/null; then
+  # Same lockfile and Python as CI; yt-dlp and deno (YouTube JS runtime) as isolated tools in ~/.local/bin.
+  uv sync --locked --python 3.12
+  uv tool install --upgrade "yt-dlp[default]"
+  uv tool install --upgrade deno
+  . .venv/bin/activate
+else
+  [ -d .venv ] || python3 -m venv .venv
+  . .venv/bin/activate
+  pip install --quiet --upgrade pip
+  pip install --quiet -U yt-dlp "onnx-asr[cpu,hub]==0.12.0" numpy pillow pyyaml
+fi
 
 say "Configuração"
 [ -f .env ] || { cp .env.example .env; echo "criado .env a partir de .env.example: preencha o Telegram (docs/pt-br/TELEGRAM.md)"; }

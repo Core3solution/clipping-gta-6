@@ -1,8 +1,11 @@
 """The development structure itself: hooks behave, settings are valid, skills and agents are well-formed."""
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -37,6 +40,38 @@ class GuardHookTests(unittest.TestCase):
         self.assertEqual(out.returncode, 0)
         self.assertIn("Branch:", out.stdout)
         self.assertLess(len(out.stdout.splitlines()), 30)
+
+
+class VenvHookTests(unittest.TestCase):
+    """On the PC the deps live in .venv (uv sync); system python3 has none of them."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        (self.tmp / ".venv" / "bin").mkdir(parents=True)
+        self.env = dict(os.environ, CLAUDE_PROJECT_DIR=str(self.tmp))
+        self.env.pop("CLIPPER_SKIP_VERIFY", None)
+
+    def test_session_hook_puts_venv_on_path_for_bash(self):
+        env_file = self.tmp / "claude-env"
+        for _ in range(2):  # resume/compact run it again: no duplicate line
+            out = run_hook("session_context.py", {"source": "startup"}, env=dict(self.env, CLAUDE_ENV_FILE=str(env_file)))
+            self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(len(env_file.read_text().splitlines()), 1)
+        sourced = subprocess.run(["bash", "-c", f". {env_file}; echo $VIRTUAL_ENV; echo $PATH"],
+                                 capture_output=True, text=True).stdout.splitlines()
+        self.assertEqual(sourced[0], str(self.tmp / ".venv"))
+        self.assertTrue(sourced[1].startswith(f"{self.tmp}/.venv/bin:"))
+
+    def test_stop_hook_runs_tests_with_venv_python(self):
+        fake = self.tmp / ".venv" / "bin" / "python"
+        fake.write_text("#!/bin/sh\necho VENV_PYTHON_USED >&2\nexit 1\n")
+        fake.chmod(0o755)
+        subprocess.run(["git", "init", "-q", str(self.tmp)], check=True)
+        (self.tmp / "a.py").write_text("x = 1\n")
+        out = run_hook("verify_on_stop.py", {}, env=self.env)
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("VENV_PYTHON_USED", out.stderr)
 
 
 class StructureTests(unittest.TestCase):

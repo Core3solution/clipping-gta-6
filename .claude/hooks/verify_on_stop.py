@@ -32,7 +32,9 @@ def main():
     digest = hashlib.sha1((git("diff", "HEAD", "--", *py) + "".join(py)).encode()).hexdigest()
     if MARK.exists() and MARK.read_text().strip() == digest:
         return
-    res = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT,
+    venv_py = ROOT / ".venv" / "bin" / "python"  # PC: deps in .venv (uv sync); cloud: system python3
+    py_exe = str(venv_py) if venv_py.exists() else sys.executable
+    res = subprocess.run([py_exe, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT,
                          capture_output=True, text=True, timeout=900)
     if res.returncode == 0:
         MARK.write_text(digest)
