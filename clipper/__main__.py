@@ -176,10 +176,13 @@ def main(argv=None):
     tg.add_argument("--limit", type=int, help="send: at most N clips this run")
     tg.add_argument("--dry-run", action="store_true", help="send: list what would go out, send nothing")
     tg.add_argument("--done", action="store_true", help="requests: mark TEXT (a link) as produced")
-    vd = sub.add_parser("vods", help="recover finished VODs and the new part of lives still running (Twitch), in chunks")
+    vd = sub.add_parser("vods", help="recover finished VODs and the new part of lives still running (Twitch, Kick), "
+                                     "in chunks")
     vd.add_argument("action", choices=["scan", "fetch", "status"])
     vd.add_argument("--max-chunks", type=int, help="fetch: chunks to download this run (default vods.max_chunks_per_run)")
     vd.add_argument("--dry-run", action="store_true", help="fetch: show the chunks it would download")
+    vd.add_argument("--no-analyze", action="store_true",
+                    help="fetch: only download (capture apart from the transcription queue: `analyze JOB` later)")
     args = p.parse_args(argv)
     config.load_env()
     cfg = config.load(args.config, args.profile)
@@ -353,7 +356,7 @@ def main(argv=None):
         if args.action == "scan":
             out = vods_mod.scan(cfg)
         elif args.action == "fetch":
-            out = vods_mod.fetch_chunks(cfg, args.max_chunks, args.dry_run)
+            out = vods_mod.fetch_chunks(cfg, args.max_chunks, args.dry_run, analyze=not args.no_analyze)
         else:
             out = vods_mod.status()
         print(json.dumps(out, indent=2, ensure_ascii=False))

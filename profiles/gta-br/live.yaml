@@ -1,3 +1,10 @@
 # Live streams (and their VODs) to clip while they're on topic. Managed by `python3 -m clipper --profile gta-br live add`.
 # Add only streamers you authorized, e.g. `live add twitch:nome kick:nome`.
-streams: []
+# vod_from: footage before this time is never fetched (skip the pre-game part); channel: the name in the credits.
+# Davy Jones streams the same live on YouTube and Kick: only Kick here (YouTube can't be cut by range while live).
+streams:
+- name: davyjones-kick
+  url: https://kick.com/davyjones
+  topic_only: true
+  channel: Davy Jones
+  vod_from: '2026-11-18T08:00:00-03:00'

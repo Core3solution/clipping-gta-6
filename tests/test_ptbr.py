@@ -1,11 +1,14 @@
 """Tests for the Brazilian adaptation: gta-br profile, Portuguese hooks and censorship, encoder choice, Telegram
 delivery/approval (against a local fake Bot API) and VOD chunk recovery (yt-dlp mocked)."""
+import functools
+import http.server
 import json
 import os
 import subprocess
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from unittest import mock
@@ -265,6 +268,62 @@ class VodChunkTests(unittest.TestCase):
                 calls.clear()
                 out = vods.fetch_chunks(cfg, analyze=False)  # next run: continues at 1800, never refetches 0-1800
                 self.assertEqual(calls[0], (1800.0, 3600.0))
+
+    def test_hls_master_and_media_playlists(self):
+        master = ("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=8000000,RESOLUTION=1920x1080\n1080p60/playlist.m3u8\n"
+                  "#EXT-X-STREAM-INF:BANDWIDTH=3000000,RESOLUTION=1280x720\n720p60/playlist.m3u8\n")
+        base = "https://cdn.example/x/master.m3u8"
+        self.assertEqual(vods.pick_variant(master, base, 1080), "https://cdn.example/x/1080p60/playlist.m3u8")
+        self.assertEqual(vods.pick_variant(master, base, 720), "https://cdn.example/x/720p60/playlist.m3u8")
+        media = "#EXTM3U\n#EXTINF:10.000,\n0.ts\n#EXTINF:10.000,\n1.ts\n#EXTINF:4.5,\n2.ts\n#EXT-X-ENDLIST\n"
+        segs = vods.parse_segments(media, "https://cdn.example/x/1080p60/playlist.m3u8")
+        self.assertEqual([(s[0], s[1]) for s in segs], [(0.0, 10.0), (10.0, 10.0), (20.0, 4.5)])
+        self.assertEqual(segs[2][2], "https://cdn.example/x/1080p60/2.ts")
+
+    def test_hls_download_takes_exactly_the_range_without_reencoding(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = Path(d) / "src"
+            src.mkdir()
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=d=6:s=160x120:r=30",
+                            "-f", "lavfi", "-i", "sine=d=6", "-c:v", "libx264", "-g", "30", "-c:a", "aac", "-f", "hls",
+                            "-hls_time", "2", "-hls_playlist_type", "vod", str(src / "p.m3u8")], check=True)
+            handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(src))
+            handler.log_message = lambda *a: None
+            srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            self.addCleanup(srv.server_close)
+            self.addCleanup(srv.shutdown)
+            dest = Path(d) / "job" / "source.mp4"
+            dest.parent.mkdir()
+            vods.download_hls(f"http://127.0.0.1:{srv.server_port}/p.m3u8", 2, 6, dest)
+            probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_name",
+                                    "-of", "csv=p=0", str(dest)], capture_output=True, text=True).stdout
+            self.assertIn("h264", probe)
+            self.assertIn("aac", probe)
+            self.assertAlmostEqual(float(probe.strip().splitlines()[-1]), 4.0, delta=0.2)
+            self.assertFalse((dest.parent / "segments").exists())  # temporary segments cleaned up
+
+    def test_kick_vods_start_at_vod_from_and_skip_older_broadcasts(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"CLIPPER_STATE_DIR": d}):
+            cfg = {"topic_patterns": ["\\bgta ?(6|vi)\\b"], "vods": {"chunk_minutes": 30}}
+            started = datetime(2026, 11, 18, 9, 32, 24, tzinfo=timezone.utc).timestamp()
+            entries = [{"id": "kick-2", "url": "https://cdn/2/1080p60/playlist.m3u8", "page": "https://kick.com/d/videos/b",
+                        "info": {"timestamp": started, "title": "GTA 6 GAMEPLAY", "is_live": True, "duration": 9000,
+                                 "uploader": "Davy Jones"}},
+                       {"id": "kick-1", "url": "https://cdn/1/1080p60/playlist.m3u8", "page": "https://kick.com/d/videos/a",
+                        "info": {"timestamp": started - 86400, "title": "GTA 6 TA CHEGANDO", "is_live": False,
+                                 "duration": 10540, "uploader": "Davy Jones"}}]
+            stream = {"name": "davyjones-kick", "url": "https://kick.com/davyjones",
+                      "vod_from": datetime(2026, 11, 18, 8, 0, tzinfo=timezone(timedelta(hours=-3)))}
+            with mock.patch.object(vods, "load_streams", return_value=[stream]), \
+                    mock.patch.object(vods, "kick_vods", return_value=entries) as kv:
+                out = vods.scan(cfg, now=started + 9000)
+            kv.assert_called_once_with("davyjones", 1080)
+            self.assertEqual({c["vod"] for c in out["chunks"]}, {"kick-2"})  # the 16/11 broadcast ended before 08:00
+            first = out["chunks"][0]
+            self.assertEqual(first["start"], 5220.0)  # 08:00 is 5256 s in; floored to the minute, never later
+            self.assertEqual((first["end"], first["page"], first["channel"]), (7020.0, "https://kick.com/d/videos/b",
+                                                                                 "Davy Jones"))
 
     def test_off_topic_vod_is_skipped(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {"CLIPPER_STATE_DIR": d}):

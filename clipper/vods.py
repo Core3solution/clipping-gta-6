@@ -8,13 +8,22 @@ the recorder. This is what lets the operation work from a cloud routine or with 
 Progress per VOD (seconds already turned into jobs, failures) is kept in state/vods.json, so a fresh clone or a
 crashed run picks up where the last one stopped, and no second of footage is fetched twice.
 
-Streams come from the profile's live.yaml (`twitch:name`); Kick and YouTube lives are recovered later through their
-uploads (`creators.yaml` + `clipper daily`)."""
+Kick does the same (its VOD is an HLS playlist that grows during the live), read from Kick's public JSON and fetched
+segment by segment. YouTube lives can't be cut by range while running (yt-dlp: "cannot be partially downloaded"), so
+they are recovered later through their uploads (`creators.yaml` + `clipper daily`), or through the same live on Kick.
+
+Streams come from the profile's live.yaml (`twitch:name`, `kick:name`). Optional per stream: `vod_from` (ISO time:
+footage before it is never fetched, e.g. the pre-game part of today's live) and `channel` (the name in the credits)."""
 import json
 import re
+import shutil
 import subprocess
+import time
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urljoin
 
 from . import config, state
 from .config import JOBS
@@ -24,12 +33,117 @@ from .sources import topic_evidence
 STATE = "vods"
 EDGE_S = 120          # a live VOD's last 2 minutes may still be incomplete on Twitch's side
 MAX_ATTEMPTS = 3      # a chunk that fails this often is skipped (and reported) instead of blocking the queue
+HLS_WORKERS = 6       # one connection fetches Kick 1080p60 at ~2x real time; six reach ~4x on a 30 Mbps line
+UA = {"User-Agent": "Mozilla/5.0 (clipper)", "Accept": "application/json"}
 
 
 def settings(cfg):
     v = cfg.get("vods") or {}
     return {"chunk": int(v.get("chunk_minutes", 30)) * 60, "max": int(v.get("max_chunks_per_run", 4)),
-            "lookback_h": float(v.get("lookback_hours", 48)), "min": int(v.get("min_chunk_minutes", 10)) * 60}
+            "lookback_h": float(v.get("lookback_hours", 48)), "min": int(v.get("min_chunk_minutes", 10)) * 60,
+            "max_height": int(v.get("max_height", 1080))}
+
+
+def http_get(url, timeout=60, tries=3):
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=timeout) as r:
+                return r.read()
+        except OSError:
+            if i == tries - 1:
+                raise
+            time.sleep(2 * (i + 1))
+
+
+def pick_variant(master, base_url, max_height):
+    """The tallest rendition of an HLS master playlist that fits max_height (Kick: 1080p60, 720p60, ...)."""
+    best, lines = None, master.splitlines()
+    for i, ln in enumerate(lines[:-1]):
+        m = re.search(r"RESOLUTION=\d+x(\d+)", ln) if ln.startswith("#EXT-X-STREAM-INF") else None
+        if m and int(m.group(1)) <= max_height and (not best or int(m.group(1)) > best[0]):
+            best = (int(m.group(1)), urljoin(base_url, lines[i + 1].strip()))
+    if not best:
+        raise RuntimeError("no HLS rendition at or below the height limit")
+    return best[1]
+
+
+def parse_segments(media, base_url):
+    """[(start_s, duration_s, url)] of an HLS media playlist."""
+    out, t, dur = [], 0.0, None
+    for ln in (x.strip() for x in media.splitlines()):
+        if ln.startswith("#EXTINF:"):
+            dur = float(ln[8:].split(",")[0])
+        elif ln and not ln.startswith("#") and dur is not None:
+            out.append((t, dur, urljoin(base_url, ln)))
+            t, dur = t + dur, None
+    return out
+
+
+def download_hls(url, start, end, dest):
+    """The segments covering [start, end) fetched in parallel, then joined without re-encoding: the chunk keeps the
+    stream's own quality, frame rate and audio. Segments already on disk (a crashed run) are not fetched again."""
+    dest = Path(dest)
+    segs = [s for s in parse_segments(http_get(url).decode("utf-8", "replace"), url) if s[0] + s[1] > start + 0.01
+            and s[0] < end - 0.01]
+    if not segs:
+        raise RuntimeError("no HLS segments in the requested range")
+    tmp = dest.parent / "segments"
+    tmp.mkdir(parents=True, exist_ok=True)
+
+    def get(item):
+        i, (_, _, seg_url) = item
+        f = tmp / f"{i:05d}.ts"
+        if not f.exists():
+            part = f.with_suffix(".part")
+            part.write_bytes(http_get(seg_url))
+            part.replace(f)
+        return f
+
+    with ThreadPoolExecutor(HLS_WORKERS) as ex:
+        files = list(ex.map(get, enumerate(segs)))
+    joined = tmp / "joined.ts"  # MPEG-TS segments concatenate byte by byte
+    with open(joined, "wb") as out:
+        for f in files:
+            with open(f, "rb") as src:
+                shutil.copyfileobj(src, out)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(joined), "-map", "0:v:0", "-map", "0:a:0?",
+                    "-c", "copy", "-movflags", "+faststart", str(dest)], check=True, capture_output=True, timeout=1800)
+    shutil.rmtree(tmp)
+    return dest
+
+
+def kick_name(url):
+    m = re.search(r"kick\.com/([^/?#]+)", url or "")
+    return m.group(1).lower() if m else None
+
+
+def kick_vods(name, max_height, limit=5):
+    """Kick broadcasts newest first, already shaped like yt-dlp's info, with the HLS rendition to download.
+    A running live has duration 0 in the API: its length is read from the growing playlist."""
+    out = []
+    for x in json.loads(http_get(f"https://kick.com/api/v2/channels/{name}/videos"))[:limit]:
+        if not x.get("source"):
+            continue
+        variant = pick_variant(http_get(x["source"]).decode("utf-8", "replace"), x["source"], max_height)
+        live = bool(x.get("is_live"))
+        dur = (sum(s[1] for s in parse_segments(http_get(variant).decode("utf-8", "replace"), variant)) if live
+               else float(x.get("duration") or 0) / 1000)
+        started = datetime.strptime(x["start_time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
+        uuid = (x.get("video") or {}).get("uuid")
+        out.append({"id": f"kick-{x['id']}", "url": variant,
+                    "page": f"https://kick.com/{name}/videos/{uuid}" if uuid else f"https://kick.com/{name}",
+                    "info": {"timestamp": started, "title": x.get("session_title") or "", "is_live": live,
+                             "duration": dur, "uploader": name}})
+    return out
+
+
+def vod_from(stream):
+    """live.yaml `vod_from` as a timestamp (YAML may already have parsed it into a datetime), or None."""
+    v = stream.get("vod_from")
+    if not v:
+        return None
+    v = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    return (v if v.tzinfo else v.astimezone()).timestamp()
 
 
 def ytdlp_json(url, flat=False, limit=None):
@@ -44,6 +158,8 @@ def ytdlp_json(url, flat=False, limit=None):
 
 def download(url, start, end, dest):
     """Only [start, end] of the VOD, at up to 1080p, into dest (mp4)."""
+    if ".m3u8" in url:
+        return download_hls(url, start, end, dest)
     dest = Path(dest)
     cmd = ["yt-dlp", "--no-warnings", "--no-part", "-f", "best[height<=1080]/best", "--download-sections",
            f"*{int(start)}-{int(end)}", "--merge-output-format", "mp4", "-o", str(dest.with_suffix(".%(ext)s")), url]
@@ -95,20 +211,21 @@ def scan(cfg, now=None):
     now = now or datetime.now(timezone.utc).timestamp()
     plan, skipped, errors = [], [], []
     for stream in load_streams():
-        name = twitch_name(stream.get("url"))
-        if not name:
+        name, kick = twitch_name(stream.get("url")), kick_name(stream.get("url"))
+        if not (name or kick):
             continue
         try:
-            vods = recent_vods(name)
-        except (RuntimeError, subprocess.SubprocessError, ValueError) as e:
+            vods = kick_vods(kick, s["max_height"]) if kick else recent_vods(name)
+        except (RuntimeError, subprocess.SubprocessError, ValueError, OSError) as e:
             errors.append({"stream": stream["name"], "error": str(e)})
             continue
+        since = vod_from(stream)
         for v in vods:
             rec = st.get(v["id"], {})
             if rec.get("finished") and rec.get("done", 0) >= rec.get("duration", 0) - 1:
                 continue
             try:
-                info = ytdlp_json(v["url"])
+                info = v.get("info") or ytdlp_json(v["url"])
             except (RuntimeError, subprocess.SubprocessError, ValueError) as e:
                 errors.append({"stream": stream["name"], "vod": v["id"], "error": str(e)})
                 continue
@@ -121,13 +238,19 @@ def scan(cfg, now=None):
                 continue
             live = bool(info.get("is_live") or info.get("live_status") == "is_live")
             dur = float(info.get("duration") or 0)
-            for a, b in plan_chunks(dur, rec.get("done", 0), live, s):
+            first = 0.0
+            if since and started:
+                if started + dur < since:  # ended before the wanted start
+                    continue
+                first = max(0.0, (since - started) // 60 * 60)  # floored to the minute: never miss the start
+            for a, b in plan_chunks(dur, rec.get("done", first), live, s):
                 key = f"{int(a)}-{int(b)}"
                 if (rec.get("failures") or {}).get(key, 0) >= MAX_ATTEMPTS:
                     continue
-                plan.append({"stream": stream["name"], "channel": info.get("uploader") or stream["name"],
-                             "vod": v["id"], "url": v["url"], "title": title, "live": live, "duration": dur,
-                             "started_at": started, "start": a, "end": b})
+                plan.append({"stream": stream["name"],
+                             "channel": stream.get("channel") or info.get("uploader") or stream["name"],
+                             "vod": v["id"], "url": v["url"], "page": v.get("page") or v["url"], "title": title,
+                             "live": live, "duration": dur, "started_at": started, "start": a, "end": b})
     return {"chunks": order(plan), "skipped_off_topic": skipped, "errors": errors}
 
 
@@ -154,7 +277,7 @@ def make_job(c, src):
     job.mkdir(parents=True, exist_ok=True)
     dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0",
                                 str(src)], capture_output=True, text=True).stdout.strip() or 0)
-    meta = {"id": job.name, "url": c["url"], "title": c["title"], "channel": c["channel"], "duration": round(dur),
+    meta = {"id": job.name, "url": c.get("page") or c["url"], "title": c["title"], "channel": c["channel"], "duration": round(dur),
             "offset": float(c["start"]), "live": True, "vod": c["vod"],
             "recorded_at": (c["started_at"] or 0) + float(c["start"]) or None, "profile": config.PROFILE}
     (job / "job.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -177,7 +300,7 @@ def fetch_chunks(cfg, max_chunks=None, dry_run=False, analyze=True):
     for c in todo:
         if c["vod"] in blocked:  # chunks of a VOD are sequential: after a failure, retry from there next run
             continue
-        rec = st.setdefault(c["vod"], {"stream": c["stream"], "done": 0.0})
+        rec = st.setdefault(c["vod"], {"stream": c["stream"], "done": float(c["start"])})  # vod_from may skip ahead
         rec.update(duration=c["duration"], finished=not c["live"], title=c["title"])
         job = JOBS / job_id(c)
         src = job / "source.mp4"
