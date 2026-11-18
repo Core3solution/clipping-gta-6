@@ -3,7 +3,6 @@ not a screen capture. Needs ffmpeg and yt-dlp; skipped without them (CI has neit
 import functools
 import http.server
 import shutil
-import signal
 import subprocess
 import sys
 import tempfile
@@ -14,6 +13,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = all(shutil.which(t) for t in ("ffmpeg", "ffprobe", "yt-dlp"))
+
+
+def stop_recorder(proc, jobs):
+    """What `live` does to stop a recorder: SIGTERM, or a stop file on Windows."""
+    from clipper import live
+    live.request_stop(proc.pid, jobs / "_live" / "synth")
 
 
 def frame_hashes(*inputs):
@@ -72,7 +77,7 @@ class LiveRecordingTests(unittest.TestCase):
                 recorder = subprocess.Popen([sys.executable, "-c", harness, str(ROOT), str(jobs), url],
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 time.sleep(20)
-                recorder.send_signal(signal.SIGTERM)  # what `live` does to stop a recorder
+                stop_recorder(recorder, jobs)
                 log = recorder.communicate(timeout=60)[0]
             finally:
                 if recorder and recorder.poll() is None:
@@ -134,11 +139,12 @@ class RecorderHandoverTests(unittest.TestCase):
                 old = subprocess.Popen([sys.executable, "-c", harness, str(ROOT), str(jobs), url, "0"],
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 time.sleep(12)
-                new = subprocess.Popen([sys.executable, "-c", harness, str(ROOT), str(jobs), url, str(old.pid)],
+                old_pid = (jobs / "_live" / "synth" / "pid").read_text()  # what `live restart` replaces
+                new = subprocess.Popen([sys.executable, "-c", harness, str(ROOT), str(jobs), url, old_pid],
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
                 old_log = old.communicate(timeout=90)[0]  # the new recorder stops it once it's writing
                 time.sleep(8)
-                new.send_signal(signal.SIGTERM)
+                stop_recorder(new, jobs)
                 new_log = new.communicate(timeout=60)[0]
             finally:
                 for proc in (old, new):

@@ -3,7 +3,6 @@
 A recorder per live stream runs ffmpeg's segment muxer on the stream's HLS URL, so there's no gap between chunks.
 Each finished chunk is remuxed into jobs/live-<name>-<time>/ with job.json + source.info.json, ready for
 `clipper analyze`."""
-import fcntl
 import json
 import os
 import shutil
@@ -23,8 +22,19 @@ from . import config
 from .config import JOBS, ROOT
 from .sources import topic_evidence
 
+WIN = os.name == "nt"
+if WIN:
+    import ctypes
+    import msvcrt
+else:
+    import fcntl
+
 WORK = JOBS / "_live"  # shared by all profiles: one recorder per stream, one set of analysis slots
 HEADER = "# Live streams to record while they're on topic. Managed by `python3 -m clipper live add|remove`.\n"
+# Background processes outlive `live watch`. Windows ignores start_new_session: a new process group keeps the
+# terminal's Ctrl+C away and a hidden console keeps each recorder/ffmpeg from opening a window.
+DETACH = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW} if WIN
+          else {"start_new_session": True})
 
 
 def slug(text):
@@ -104,20 +114,61 @@ def probe(url):
             "tags": info.get("tags") or [], "channel": info.get("channel") or info.get("uploader")}
 
 
+def _win_alive(pid):
+    """os.kill(pid, 0) would *terminate* the process on Windows; ask the kernel for its exit code instead."""
+    k = ctypes.WinDLL("kernel32")
+    k.OpenProcess.restype = ctypes.c_void_p
+    h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    code = ctypes.c_ulong()
+    ok = k.GetExitCodeProcess(ctypes.c_void_p(h), ctypes.byref(code))
+    k.CloseHandle(ctypes.c_void_p(h))
+    return bool(ok) and code.value == 259  # STILL_ACTIVE
+
+
 def _alive(pid_file):
     try:
         pid = int(pid_file.read_text())
+        if WIN:
+            return pid if _win_alive(pid) else None
         os.kill(pid, 0)
         return pid
     except (OSError, ValueError):
         return None
 
 
+def _try_lock(f):
+    """Non-blocking exclusive lock on an open file; BlockingIOError while another process holds it."""
+    if not WIN:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    try:
+        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+    except OSError as e:
+        raise BlockingIOError(*e.args) from e
+
+
+def request_stop(pid, d):
+    """Ask a recorder to save its last chunk and exit: SIGTERM, or on Windows (no signals between processes) a
+    stop file next to its pid file, which it checks between polls."""
+    if WIN:
+        (d / f"stop-{pid}").write_text("")
+    else:
+        os.kill(pid, signal.SIGTERM)
+
+
+def _own_pids():
+    """This process, plus on Windows its parent: a venv's python.exe there is a launcher that runs the real
+    interpreter as a child, so the pid Popen returned (and `watch` wrote down) is the launcher's."""
+    return (os.getpid(), os.getppid()) if WIN else (os.getpid(),)
+
+
 def claim(d, replace_pid=None):
     """Take a stream's pid file. Refused while another live recorder owns it (unless it's the one being replaced),
     so a stream never gets two recorders."""
     cur = _alive(d / "pid")
-    if cur and cur not in (os.getpid(), replace_pid):
+    if cur and cur not in (*_own_pids(), replace_pid):
         return False
     (d / "pid").write_text(str(os.getpid()))
     return True
@@ -125,7 +176,7 @@ def claim(d, replace_pid=None):
 
 def release(d):
     """Remove the pid file only if it's still ours: a replacement recorder may own it by now."""
-    if _alive(d / "pid") == os.getpid():
+    if _alive(d / "pid") in _own_pids():
         (d / "pid").unlink(missing_ok=True)
 
 
@@ -189,9 +240,9 @@ def reanalyze_stranded():
         job = JOBS / jid
         tries = job / "analyze_tries"
         tries.write_text(str(int(tries.read_text() or 0 if tries.exists() else 0) + 1))
-        log = open(WORK / "reanalyze.log", "a")
-        proc = subprocess.Popen([sys.executable, "-m", "clipper", "live", "analyze", jid], cwd=ROOT, stdout=log,
-                                stderr=log, start_new_session=True, env=profile_env())
+        with open(WORK / "reanalyze.log", "a") as log:  # the child keeps its own handle
+            proc = subprocess.Popen([sys.executable, "-m", "clipper", "live", "analyze", jid], cwd=ROOT, stdout=log,
+                                    stderr=log, env=profile_env(), **DETACH)
         (job / "analyzing").write_text(str(proc.pid))
         started.append(jid)
     return started
@@ -210,10 +261,10 @@ def watch(cfg, chunk_minutes=30):
         if s["live"] and s["on_topic"] and not s["recording"]:
             d = WORK / slug(s["name"])
             d.mkdir(parents=True, exist_ok=True)
-            log = open(d / "recorder.log", "a")
-            proc = subprocess.Popen([sys.executable, "-m", "clipper", "live", "record", s["name"], s["url"],
-                                     "--chunk", str(chunk_minutes)], cwd=ROOT, stdout=log, stderr=log,
-                                    start_new_session=True, env=profile_env())
+            with open(d / "recorder.log", "a") as log:
+                proc = subprocess.Popen([sys.executable, "-m", "clipper", "live", "record", s["name"], s["url"],
+                                         "--chunk", str(chunk_minutes)], cwd=ROOT, stdout=log, stderr=log,
+                                        env=profile_env(), **DETACH)
             (d / "pid").write_text(str(proc.pid))
             started.append(s["name"])
     return started
@@ -299,7 +350,7 @@ def analyze_queued(jid, cfg):
         for i in range(n):
             f = open(slots / f"{i}.lock", "w")
             try:
-                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _try_lock(f)
             except BlockingIOError:
                 f.close()
                 continue
@@ -336,10 +387,22 @@ def record(name, url, chunk_minutes=30, quality="best[height<=1080]/best", cfg=N
         return
     stop = []
     signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
+    stop_files = [d / f"stop-{pid}" for pid in _own_pids()] if WIN else []
+    if WIN:
+        signal.signal(signal.SIGBREAK, lambda *_: stop.append(1))  # Ctrl+Break in the recorder's own console
+        for f in stop_files:
+            f.unlink(missing_ok=True)  # a stale request for a recycled pid
+        (d / "chunk").write_text(str(chunk_minutes))  # what `restart` reads from /proc elsewhere
+
+    def stopping():
+        if any(f.exists() for f in stop_files):
+            stop.append(1)
+        return stop
+
     misses = 0
     pending = []
     p, reconnect = {}, False
-    while not stop and misses < 3:
+    while not stopping() and misses < 3:
         if not reconnect:  # after a session drops, go straight for a fresh HLS URL: no re-probe gap in the recording
             p = probe(url)
             if not p.get("live"):
@@ -356,11 +419,11 @@ def record(name, url, chunk_minutes=30, quality="best[height<=1080]/best", cfg=N
         pattern = d / f"{int(session)}-%04d.ts"
         ff = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-i", hls.stdout.strip().splitlines()[0], "-c", "copy",
                                "-f", "segment", "-segment_time", str(chunk_minutes * 60), "-reset_timestamps", "1",
-                               str(pattern)])
+                               str(pattern)], **({"stdin": subprocess.PIPE} if WIN else {}))
         done = set()
         if replace_pid and _recording_started(d, session):
             try:
-                os.kill(replace_pid, signal.SIGTERM)  # it saves its last partial chunk and exits
+                request_stop(replace_pid, d)  # it saves its last partial chunk and exits
                 print(f"[live] took over from recorder {replace_pid}", flush=True)
             except OSError:
                 pass
@@ -379,17 +442,32 @@ def record(name, url, chunk_minutes=30, quality="best[height<=1080]/best", cfg=N
                         t = threading.Thread(target=analyze_queued, args=(jid, cfg))
                         t.start()
                         pending.append(t)
-        while ff.poll() is None and not stop:
+        while ff.poll() is None and not stopping():
             time.sleep(20)
             finish()
         if stop:
-            ff.terminate()
-            ff.wait()
+            _stop_ffmpeg(ff)
         finish(final=True)  # ffmpeg ended: the HLS URL expired or the stream stopped
         reconnect = not stop
     for t in pending:
         t.join()
     release(d)
+    for f in stop_files:
+        f.unlink(missing_ok=True)
+
+
+def _stop_ffmpeg(ff):
+    """SIGTERM lets ffmpeg close the segment it's writing. Windows' terminate() is a hard kill, so ask with 'q'."""
+    if WIN:
+        try:
+            ff.stdin.write(b"q")
+            ff.stdin.flush()
+            ff.wait(timeout=30)
+            return
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+    ff.terminate()
+    ff.wait()
 
 
 def restart(name, chunk_minutes=30):
@@ -405,11 +483,14 @@ def restart(name, chunk_minutes=30):
             argv = Path(f"/proc/{old}/cmdline").read_bytes().split(b"\0")
             chunk_minutes = int(argv[argv.index(b"--chunk") + 1])
         except (OSError, ValueError, IndexError):
-            pass
-    log = open(d / "recorder.log", "a")
+            try:  # Windows has no /proc: the recorder wrote it down
+                chunk_minutes = int((d / "chunk").read_text())
+            except (OSError, ValueError):
+                pass
     cmd = [sys.executable, "-m", "clipper", "live", "record", s["name"], s["url"], "--chunk", str(chunk_minutes)]
-    proc = subprocess.Popen(cmd + (["--replace", str(old)] if old else []), cwd=ROOT, stdout=log, stderr=log,
-                            start_new_session=True, env=profile_env())
+    with open(d / "recorder.log", "a") as log:
+        proc = subprocess.Popen(cmd + (["--replace", str(old)] if old else []), cwd=ROOT, stdout=log, stderr=log,
+                                env=profile_env(), **DETACH)
     return {"stream": s["name"], "new_pid": proc.pid, "replacing": old, "chunk": chunk_minutes}
 
 

@@ -201,6 +201,7 @@ class OutputNamingTests(unittest.TestCase):
 
 class VoiceSetupTests(unittest.TestCase):
     def test_reads_key_after_instructions_and_saves_env(self):
+        import os
         import tempfile
         from pathlib import Path
         from clipper import voice_setup
@@ -214,7 +215,8 @@ class VoiceSetupTests(unittest.TestCase):
             env.write_text("OTHER=1\nFISH_API_KEY=old\n")
             voice_setup.save_key("newkey1234567890", env)
             self.assertEqual(env.read_text(), "OTHER=1\nFISH_API_KEY=newkey1234567890\n")
-            self.assertEqual(env.stat().st_mode & 0o777, 0o600)
+            if os.name == "posix":  # Windows has no owner-only mode bits; chmod there is a no-op
+                self.assertEqual(env.stat().st_mode & 0o777, 0o600)
 
 
 class FontTests(unittest.TestCase):
@@ -691,7 +693,7 @@ class LinuxPortTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"PATH": "/usr/bin:/bin"}):
             cli.tools_on_path()
             cli.tools_on_path()  # idempotent
-            self.assertEqual(os.environ["PATH"], f"{Path(sys.executable).parent}:/usr/bin:/bin")
+            self.assertEqual(os.environ["PATH"], f"{Path(sys.executable).parent}{os.pathsep}/usr/bin:/bin")
 
     def test_live_pending_exit_code(self):
         from unittest import mock
@@ -1127,11 +1129,13 @@ class WholeStreamTests(unittest.TestCase):
                 mock.patch.object(live.subprocess, "Popen", return_value=mock.Mock(pid=4242)) as po:
             (Path(d) / "kaicenat-twitch").mkdir()
             (Path(d) / "kaicenat-twitch" / "pid").write_text(str(os.getpid()))
+            (Path(d) / "kaicenat-twitch" / "chunk").write_text("15")  # this test runner has no --chunk in /proc
             out = live.restart("kaicenat-twitch", 10)
         self.assertEqual((out["replacing"], out["new_pid"]), (os.getpid(), 4242))
         cmd = po.call_args[0][0]
         self.assertEqual(cmd[-2:], ["--replace", str(os.getpid())])
         self.assertIn("record", cmd)
+        self.assertEqual(cmd[cmd.index("--chunk") + 1], "15")  # the old recorder's chunk length is kept
 
 
 class TopHookTests(unittest.TestCase):
@@ -1201,6 +1205,45 @@ class RecorderPidTests(unittest.TestCase):
         finally:
             other.kill()
             other.wait()
+
+    def test_checking_a_pid_never_stops_the_process(self):
+        import subprocess
+        import sys
+        import tempfile
+        from pathlib import Path
+        from clipper import live
+        other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            with tempfile.TemporaryDirectory() as root:
+                f = Path(root) / "pid"
+                f.write_text(str(other.pid))
+                self.assertEqual(live._alive(f), other.pid)
+                self.assertEqual(live._alive(f), other.pid)
+                self.assertIsNone(other.poll())  # on Windows os.kill(pid, 0) terminates it
+                other.kill()
+                other.wait()
+                self.assertIsNone(live._alive(f))
+        finally:
+            if other.poll() is None:
+                other.kill()
+                other.wait()
+
+    def test_analysis_slot_lock_is_exclusive(self):
+        import tempfile
+        from pathlib import Path
+        from clipper import live
+        with tempfile.TemporaryDirectory() as d:
+            slot = Path(d) / "0.lock"
+            a, b = open(slot, "w"), open(slot, "w")
+            try:
+                live._try_lock(a)
+                with self.assertRaises(BlockingIOError):
+                    live._try_lock(b)
+                a.close()
+                live._try_lock(b)  # freed when the holder closes it
+            finally:
+                a.close()
+                b.close()
 
 
 class LearningSafeguardTests(unittest.TestCase):
@@ -1386,14 +1429,14 @@ class ReportTests(unittest.TestCase):
             cfg = {"profile": "gta-rp"}
             index = render.export_dir(cfg) / "index.md"
             index.parent.mkdir(parents=True)
-            index.write_text("- **video 1**: POV: xQc Breaks Into The Wrong House · xQc · 5 hooks\n")
+            index.write_text("- **video 1**: POV: xQc Breaks Into The Wrong House · xQc · 5 hooks\n", encoding="utf-8")
             render.append_report(cfg, "## Run 1\n5 videos from xQc.")
             render.append_report(cfg, "## Run 2\nNo clips: all candidates weak.")
-            text = index.read_text()
+            text = index.read_text(encoding="utf-8")
             self.assertTrue(text.startswith("- **video 1**"))
             self.assertLess(text.index("## Run 1"), text.index("## Run 2"))
         for prompt in (".claude/commands/clip-daily.md", ".codex/prompts/clip-daily.md"):
-            body = Path(prompt).read_text()
+            body = Path(prompt).read_text(encoding="utf-8")
             self.assertIn("python3 -m clipper report", body)
             self.assertIn("never Write or Edit `index.md`", body)
 
