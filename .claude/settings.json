@@ -27,18 +27,18 @@
     "SessionStart": [
       {
         "matcher": "startup|resume|clear|compact",
-        "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_context.py\"", "timeout": 15}]
+        "hooks": [{"type": "command", "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/python.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_context.py\"", "timeout": 15}]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit|Bash",
-        "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"", "timeout": 15}]
+        "matcher": "Write|Edit|MultiEdit|Bash|PowerShell",
+        "hooks": [{"type": "command", "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/python.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\"", "timeout": 15}]
       }
     ],
     "Stop": [
       {
-        "hooks": [{"type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify_on_stop.py\"", "timeout": 900}]
+        "hooks": [{"type": "command", "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/python.sh\" \"$CLAUDE_PROJECT_DIR/.claude/hooks/verify_on_stop.py\"", "timeout": 900}]
       }
     ]
   }

@@ -19,7 +19,16 @@ def git(*args):
     return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=10).stdout
 
 
+def venv_python(root):
+    """PC: deps in .venv (uv sync), bin/ on Linux and Scripts/ on Windows; cloud: no .venv, this interpreter."""
+    for p in (root / ".venv" / "bin" / "python", root / ".venv" / "Scripts" / "python.exe"):
+        if p.exists():
+            return str(p)
+    return sys.executable
+
+
 def main():
+    sys.stderr.reconfigure(encoding="utf-8")
     try:
         event = json.loads(sys.stdin.read() or "{}")
     except ValueError:
@@ -32,10 +41,8 @@ def main():
     digest = hashlib.sha1((git("diff", "HEAD", "--", *py) + "".join(py)).encode()).hexdigest()
     if MARK.exists() and MARK.read_text().strip() == digest:
         return
-    venv_py = ROOT / ".venv" / "bin" / "python"  # PC: deps in .venv (uv sync); cloud: system python3
-    py_exe = str(venv_py) if venv_py.exists() else sys.executable
-    res = subprocess.run([py_exe, "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT,
-                         capture_output=True, text=True, timeout=900)
+    res = subprocess.run([venv_python(ROOT), "-m", "unittest", "discover", "-s", "tests"], cwd=ROOT,
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     if res.returncode == 0:
         MARK.write_text(digest)
         return

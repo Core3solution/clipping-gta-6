@@ -6,7 +6,7 @@
 2. Media and private folders: refuses `git add` of .env, jobs/, exports/, logs/ or video/audio files.
 3. main branch: asks before committing or pushing on main (work happens on feature branches).
 
-Python only (no Node), so it runs the same on the PC (WSL2) and in Claude Code cloud sessions.
+Python only (no Node), so it runs the same on the PC (WSL2), the Windows notebook and Claude Code cloud sessions.
 Inspired by agentville's secret-scan and guard-main-branch hooks (Apache-2.0, see THIRD_PARTY.md)."""
 import json
 import re
@@ -23,7 +23,8 @@ SECRETS = [
     (r"\bxox[baprs]-[A-Za-z0-9-]{10,}", "token do Slack"),
     (r"-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----", "chave privada"),
 ]
-PRIVATE_ADD = re.compile(r"\bgit\s+add\b[^;&|]*?(\s|^)(\.env\b|jobs/|exports/|logs/|\S+\.(mp4|mov|mkv|webm|wav|m4a|mp3|ts)\b)")
+PRIVATE_ADD = re.compile(r"\bgit\s+add\b[^;&|]*?(\s|^)(\.env\b|jobs[\\/]|exports[\\/]|logs[\\/]"
+                         r"|\S+\.(mp4|mov|mkv|webm|wav|m4a|mp3|ts)\b)")
 BLANKET_ADD = re.compile(r"\bgit\s+add\s+(-A|--all|\.)(\s|$)")
 MAIN_WRITE = re.compile(r"\bgit\s+(commit|push)\b")
 
@@ -48,6 +49,7 @@ def block(msg):
 
 
 def main():
+    sys.stderr.reconfigure(encoding="utf-8")
     try:
         event = json.loads(sys.stdin.read() or "{}")
     except ValueError:
@@ -55,14 +57,14 @@ def main():
     ti = event.get("tool_input") or {}
     text = payload_text(ti)
     path = str(ti.get("file_path") or "")
-    if re.search(r"(^|/)\.env$", path):
+    if re.search(r"(^|[\\/])\.env$", path):
         block("guard: não escreva no .env pelo Claude. O usuário preenche os segredos (veja .env.example).")
     for pattern, name in SECRETS:
         if re.search(pattern, text):
             block(f"guard: bloqueado, o conteúdo parece conter um segredo ({name}). Use variável de ambiente ou .env, "
                   "nunca código, docs ou comandos.")
     cmd = ti.get("command") or ""
-    if event.get("tool_name") == "Bash" and cmd:
+    if event.get("tool_name") in ("Bash", "PowerShell") and cmd:
         if PRIVATE_ADD.search(cmd):
             block("guard: não adicione .env, jobs/, exports/, logs/ nem arquivos de vídeo/áudio ao git.")
         if BLANKET_ADD.search(cmd):

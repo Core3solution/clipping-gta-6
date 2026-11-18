@@ -5,6 +5,7 @@ import os
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
@@ -23,13 +24,23 @@ def section(md, title, max_lines=8):
     return lines[:max_lines]
 
 
+def bash_path(p):
+    """C:\\x\\y -> /c/x/y: Git Bash splits PATH on ':', so a Windows drive path would break it."""
+    s = str(p).replace("\\", "/")
+    return f"/{s[0].lower()}{s[2:]}" if re.match(r"^[A-Za-z]:/", s) else s
+
+
 def use_venv():
     """On the PC the deps live in .venv (uv sync), not in system python3: put it first on PATH for this session's
-    Bash commands, so `python3 -m clipper` works as the commands and docs write it. The cloud has no .venv."""
-    venv, env_file = ROOT / ".venv" / "bin", os.environ.get("CLAUDE_ENV_FILE")
+    Bash commands, so `python3 -m clipper` works as the commands and docs write it. The cloud has no .venv.
+    Windows venvs have Scripts/python.exe and no python3 (python3 is the Store stub), hence the function."""
+    win = os.name == "nt"
+    venv, env_file = ROOT / ".venv" / ("Scripts" if win else "bin"), os.environ.get("CLAUDE_ENV_FILE")
     if not (venv.is_dir() and env_file):
         return
-    line = f'export VIRTUAL_ENV={shlex.quote(str(venv.parent))} PATH={shlex.quote(str(venv))}:"$PATH"\n'
+    line = f'export VIRTUAL_ENV={shlex.quote(str(venv.parent))} PATH={shlex.quote(bash_path(venv))}:"$PATH"\n'
+    if win:
+        line = line[:-1] + '; python3() { python "$@"; }\n'
     try:
         if line not in (Path(env_file).read_text(encoding="utf-8") if Path(env_file).exists() else ""):
             with open(env_file, "a", encoding="utf-8") as f:
@@ -39,6 +50,7 @@ def use_venv():
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles default to cp1252, which has no "→"
     use_venv()
     out = [f"Projeto: {ROOT.name}. Branch: {git('branch', '--show-current') or '?'}."]
     changed = [ln for ln in git("status", "--porcelain").splitlines() if ln.strip()]
