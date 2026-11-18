@@ -1,6 +1,6 @@
 # Decisões técnicas e estado de validação
 
-Atualizado em 17/11/2026.
+Atualizado em 18/11/2026.
 
 ## O que foi implementado e o que foi testado
 
@@ -18,7 +18,7 @@ Atualizado em 17/11/2026.
 | Transcrição em português (Parakeet v3) | Já existia | **Falta testar com áudio real em PT-BR** |
 | Rotina na nuvem com o PC desligado | Documentado (`NUVEM.md`) | **Não testado** |
 
-A suíte completa (158 testes originais + 21 novos) passa. Os testes que dependem de rede ou GPU foram simulados. Esta sessão de desenvolvimento não alcança Twitch, YouTube, Telegram nem PyPI.
+A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de desenvolvimento) passa no PC (18/11, nenhum pulado) e no CI do GitHub (2 pulados lá, por falta de yt-dlp). Os testes que dependem de rede ou GPU são simulados.
 
 ## Decisões
 
@@ -31,6 +31,9 @@ A suíte completa (158 testes originais + 21 novos) passa. Os testes que depende
 7. **Nada é publicado automaticamente.** Aprovar só registra a decisão.
 8. **Editonny:** só técnicas isoladas, com crédito (`THIRD_PARTY.md`). O fluxo dele exige humano no meio e o caminho de HyperFrames precisa de Chromium e npm.
 9. **Ambiente do PC com uv (18/11/2026):** `.venv` por `uv sync --locked --python 3.12` (mesmo lockfile e Python do CI); yt-dlp e deno (runtime JS que o YouTube exige) como `uv tool` em `~/.local/bin`. O python3 do sistema não tem as dependências, então o hook de início de sessão põe o `.venv` no PATH do Claude (via `CLAUDE_ENV_FILE`) e o hook de Stop testa com `.venv/bin/python`. Na nuvem não há `.venv` e nada muda.
+10. **CI instala ffmpeg (18/11/2026):** dois testes do gta-br (zoom `perspective` e blocos de VOD, que usam `ffprobe` em `make_job`) precisam de ffmpeg real; sem ele o CI falhava. Preferimos instalar no CI a pular os testes, para o CI validar o fluxo que a nuvem vai usar.
+11. **Git no WSL (18/11/2026):** sem identidade configurada; os commits saem como `Claude <noreply@anthropic.com>` (como os do patch), para não expor e-mail pessoal. Push só com aprovação do usuário, pelo Git Credential Manager do Windows passado no próprio comando.
+12. **RTK e Context7 (18/11/2026):** RTK edição oss com hook **global** (`~/.claude/settings.json`, caminho absoluto), porque na nuvem não há `rtk` e um hook no projeto quebraria lá. Context7 aprovado só localmente (`.claude/settings.local.json`, fora do git).
 
 ## Repositórios avaliados (resumo)
 
