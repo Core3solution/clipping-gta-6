@@ -36,6 +36,9 @@ class GuardHookTests(unittest.TestCase):
                       {"tool_name": "Bash", "tool_input": {"command": "git add exports/gta-br/v.mp4"}},
                       {"tool_name": "Bash", "tool_input": {"command": "git add -A"}},
                       {"tool_name": "PowerShell", "tool_input": {"command": "git add jobs\\abc\\source.mp4"}},
+                      {"tool_name": "PowerShell", "tool_input": {"command": "git add .\\jobs\\abc\\job.json"}},
+                      {"tool_name": "Bash", "tool_input": {"command": "git add ./Exports/x/upload.json"}},
+                      {"tool_name": "PowerShell", "tool_input": {"command": "git add 'C:\\p\\logs\\a.log'"}},
                       {"tool_name": "PowerShell", "tool_input": {"command": "git add ."}},
                       {"tool_name": "Write", "tool_input": {"file_path": "C:\\proj\\.env", "content": "A=1"}},
                       {"tool_name": "Edit", "tool_input": {"file_path": "k", "new_string": "-----BEGIN OPENSSH " + "PRIVATE KEY-----"}}):

@@ -23,8 +23,8 @@ SECRETS = [
     (r"\bxox[baprs]-[A-Za-z0-9-]{10,}", "token do Slack"),
     (r"-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY-----", "chave privada"),
 ]
-PRIVATE_ADD = re.compile(r"\bgit\s+add\b[^;&|]*?(\s|^)(\.env\b|jobs[\\/]|exports[\\/]|logs[\\/]"
-                         r"|\S+\.(mp4|mov|mkv|webm|wav|m4a|mp3|ts)\b)")
+PRIVATE_ADD = re.compile(r"\bgit\s+add\b[^;&|]*?(\s|^|[\"'.\\/])(\.env\b|jobs[\\/]|exports[\\/]|logs[\\/]"
+                         r"|\S+\.(mp4|mov|mkv|webm|wav|m4a|mp3|ts)\b)", re.I)
 BLANKET_ADD = re.compile(r"\bgit\s+add\s+(-A|--all|\.)(\s|$)")
 MAIN_WRITE = re.compile(r"\bgit\s+(commit|push)\b")
 

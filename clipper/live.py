@@ -447,6 +447,8 @@ def record(name, url, chunk_minutes=30, quality="best[height<=1080]/best", cfg=N
             finish()
         if stop:
             _stop_ffmpeg(ff)
+        if ff.stdin:  # Windows only: the pipe used for 'q' would leak a handle on every reconnect
+            ff.stdin.close()
         finish(final=True)  # ffmpeg ended: the HLS URL expired or the stream stopped
         reconnect = not stop
     for t in pending:
