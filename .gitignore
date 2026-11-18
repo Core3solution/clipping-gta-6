@@ -14,3 +14,7 @@ profiles/*/learned-weights.yaml
 .gg/
 # approved meme tracks: copied to each machine by hand, never committed (Content ID claimable)
 assets/music/local/
+
+# personal Claude Code notes for this project
+CLAUDE.local.md
+.claude/settings.local.json

@@ -1,0 +1,13 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.testing.unittestEnabled": true,
+  "python.testing.pytestEnabled": false,
+  "python.testing.unittestArgs": ["-v", "-s", "tests", "-p", "test_*.py"],
+  "files.exclude": {"**/__pycache__": true},
+  "files.watcherExclude": {"**/jobs/**": true, "**/exports/**": true, "**/.venv/**": true},
+  "search.exclude": {"jobs/**": true, "exports/**": true, "uv.lock": true, "research/gaming-shorts-titles.json": true},
+  "editor.rulers": [120],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[python]": {"editor.defaultFormatter": "charliermarsh.ruff", "editor.formatOnSave": false}
+}

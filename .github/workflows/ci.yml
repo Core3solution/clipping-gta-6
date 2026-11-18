@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'ptbr-*']
   pull_request:
     branches: [main]
 

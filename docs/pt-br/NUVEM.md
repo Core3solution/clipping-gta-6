@@ -26,7 +26,7 @@ Há três caminhos, em ordem de prioridade. **Nenhum está validado ainda.** A o
 1. Suba este branch para o seu fork no GitHub.
 2. Em claude.ai/code, crie um **ambiente** "gta-br":
    - **Rede:** *Full* para o primeiro teste. Depois troque para *Custom* com: `pypi.org`, `files.pythonhosted.org`, `huggingface.co`, `*.hf.co`, `*.twitch.tv`, `*.ttvnw.net`, `*.cloudfront.net`, `api.telegram.org`.
-   - **Variáveis de ambiente:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CLIPPER_PROFILE=gta-br`, `CLIPPER_TOP_HOOKS=1`.
+   - **Variáveis de ambiente:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CLIPPER_PROFILE=gta-br`, `CLIPPER_TOP_HOOKS=1` e `CLIPPER_SKIP_VERIFY=1` (rodadas de produção não precisam rodar a suíte de testes a cada parada).
    - **Script de setup:** o conteúdo de `scripts/cloud-setup.sh`.
 3. Abra uma sessão nesse ambiente, com o seu fork, e peça:
    > Rode `python3 -m unittest discover -s tests`, depois `python3 -m clipper vods fetch --max-chunks 1` e me diga quanto tempo levou cada etapa (download, transcrição). Depois rode `/clip-br` e entregue no Telegram.

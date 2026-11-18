@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "Testes (todos)", "type": "shell", "command": "python3 -m unittest discover -s tests", "group": {"kind": "test", "isDefault": true}, "problemMatcher": []},
+    {"label": "Testes PT-BR", "type": "shell", "command": "python3 -m unittest tests.test_ptbr -v", "group": "test", "problemMatcher": []},
+    {"label": "Telegram: status", "type": "shell", "command": "python3 -m clipper --profile gta-br telegram status", "problemMatcher": []},
+    {"label": "Telegram: ler aprovações", "type": "shell", "command": "python3 -m clipper --profile gta-br telegram poll", "problemMatcher": []},
+    {"label": "VODs: o que baixaria", "type": "shell", "command": "python3 -m clipper --profile gta-br vods fetch --dry-run", "problemMatcher": []},
+    {"label": "Atualizar skills de terceiros", "type": "shell", "command": "scripts/devkit/sync-skills.sh", "problemMatcher": []}
+  ]
+}

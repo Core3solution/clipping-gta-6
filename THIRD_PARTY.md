@@ -23,3 +23,20 @@ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEM
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+## Superpowers (MIT) — `.claude/skills/` (14 skills)
+
+Copyright (c) 2025 Jesse Vincent. Vendored at commit 22f0b46 of https://github.com/obra/superpowers by
+`scripts/devkit/sync-skills.sh`; each skill folder carries `LICENSE.superpowers`. Only change: the plugin namespace
+`superpowers:` is removed from skill references (project skills have plain names).
+
+## Ponytail (MIT) — `.claude/skills/ponytail*` (5 skills)
+
+Copyright (c) 2026 DietrichGebert. Vendored at commit 96608e0 of https://github.com/DietrichGebert/ponytail;
+each skill folder carries `LICENSE.ponytail`. The plugin's Node hooks are not included.
+
+## Agentville (Apache-2.0) — ideas only
+
+`.claude/hooks/guard.py`, `verify_on_stop.py` and the agents in `.claude/agents/` are new Python/Markdown code written
+for this project, inspired by agentville's secret-scan, guard-main-branch, verify-on-stop hooks and its
+code-reviewer/debugger/explorer agents (https://github.com/soumatheusgomes/agentville). No agentville file is copied.
