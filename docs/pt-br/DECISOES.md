@@ -35,6 +35,13 @@ A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de des
 11. **Git no WSL (18/11/2026):** sem identidade configurada; os commits saem como `Claude <noreply@anthropic.com>` (como os do patch), para não expor e-mail pessoal. Push só com aprovação do usuário, pelo Git Credential Manager do Windows passado no próprio comando.
 12. **RTK e Context7 (18/11/2026):** RTK edição oss com hook **global** (`~/.claude/settings.json`, caminho absoluto), porque na nuvem não há `rtk` e um hook no projeto quebraria lá. Context7 aprovado só localmente (`.claude/settings.local.json`, fora do git).
 
+13. **Notebook Windows nativo (18/11/2026):** sem WSL e sem admin. O winget trava e o pip aponta para um espelho corporativo em HTTP (o pip recusa, e não liberamos `--trusted-host`), então ffmpeg 8.1 e uv vieram das releases oficiais no GitHub com SHA-256 conferido, em `~/.local/bin` (PATH do usuário). Os hooks passam por `.claude/hooks/python.sh`, que pula o atalho `python3` da Microsoft Store; no Linux continua chamando `python3`. O guard também cobre o PowerShell e caminhos com `\`.
+
+14. **Histórico de live do YouTube pela Kick (18/11/2026):** o yt-dlp não corta trecho de live do YouTube em andamento ("cannot be partially downloaded"), e o modo "desde o início" só junta o arquivo quando a live termina. Davy Jones transmite a mesma live na Kick, cujo VOD é HLS crescente: baixamos os segmentos de 10 s em paralelo (6 conexões, ~5x o tempo real em 1080p60) e juntamos sem recodificar. Uma plataforma por streamer, para não capturar a mesma live duas vezes.
+15. **Captura separada da análise (18/11/2026):** `vods fetch --no-analyze` em loop e uma fila que transcreve um bloco por vez (`scripts/operacao.sh`). A captura nunca espera a transcrição.
+16. **Mídia no D: por junções (18/11/2026):** `jobs/` e `exports/` apontam para `D:\GTA6-BR\` (`mklink /J`, sem admin). O código não muda e o C: (pouco espaço, paginação do Windows) fica livre. As pastas conceituais 01–07 são mapeadas sobre a estrutura existente, sem cópias ([OPERACAO.md](OPERACAO.md)).
+17. **Modelo Parakeet baixado em partes (18/11/2026):** o download do Hugging Face por uma conexão travou (~0,8 MB/s); baixamos os 4 arquivos com `curl` em 8 faixas paralelas direto no cache do Hugging Face e conferimos o SHA-256. Sem mudança de código.
+
 ## Repositórios avaliados (resumo)
 
 | Repositório | Licença | Uso |

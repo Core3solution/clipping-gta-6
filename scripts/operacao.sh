@@ -4,7 +4,7 @@
 #   sh scripts/operacao.sh analise   transcreve e pontua um bloco por vez, na ordem em que chegam
 # A captura nunca espera a análise. Ambas retomam de onde pararam (state/vods.json; candidates.json por bloco).
 cd "$(dirname "$0")/.." || exit 1
-export CLIPPER_PROFILE="${CLIPPER_PROFILE:-gta-br}" PATH="$HOME/.local/bin:$PATH"
+export CLIPPER_PROFILE="${CLIPPER_PROFILE:-gta-br}" PATH="$HOME/.local/bin:$PATH" PYTHONUTF8=1  # Windows: cp1252 has no "→"
 PY=.venv/bin/python; [ -x "$PY" ] || PY=.venv/Scripts/python.exe; [ -x "$PY" ] || PY=python3
 mkdir -p logs
 case "$1" in

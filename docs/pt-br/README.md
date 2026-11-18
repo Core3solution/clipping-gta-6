@@ -13,7 +13,8 @@ Este fork usa o clipping-gta-6 como motor de produção, adaptado ao público br
 
 | Comando | Para que serve |
 | --- | --- |
-| `clipper --profile gta-br vods fetch` | Baixa os próximos blocos de VODs da Twitch (encerrados ou em andamento), transcreve e deixa prontos para o `/clip-br` |
+| `clipper --profile gta-br vods fetch` | Baixa os próximos blocos de VODs da Twitch e da Kick (encerrados ou em andamento), transcreve e deixa prontos para o `/clip-br` |
+| `clipper --profile gta-br vods fetch --no-analyze` | Só baixa; a transcrição fica para outra fila ([OPERACAO.md](OPERACAO.md)) |
 | `clipper --profile gta-br vods fetch --dry-run` | Mostra o que baixaria, sem baixar |
 | `clipper --profile gta-br vods status` | Até onde cada VOD já foi processado (`state/vods.json`) |
 | `clipper --profile gta-br telegram send` | Envia ao Telegram os MP4 ainda não enviados (vídeo, legenda, botões Aprovar/Rejeitar e descrição para copiar) |
