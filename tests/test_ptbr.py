@@ -386,6 +386,32 @@ class ImportTests(unittest.TestCase):
                              {"status": "autorizado", "evidence": "DM no Instagram", "date": "2026-11-17"})
             self.assertEqual(self.imports.authorization("Paulinho o Loko", "gta-br")["status"], "pendente")
 
+    def test_split_uses_real_cut_times(self):
+        src = make_video(self.dir / "live.mp4", 50)
+        blocks = self.imports.split(src, self.dir / "staging", chunk_s=12, from_s=7, duration=50)
+        starts = [b["start"] for b in blocks]
+        for got, want in zip(starts, [7, 19, 31, 43]):
+            self.assertTrue(want <= got < want + 2.1, (got, want))  # cut on the first keyframe after the mark
+        self.assertEqual(len(blocks), 4)
+        for a, b in zip(blocks, blocks[1:]):
+            self.assertAlmostEqual(a["end"], b["start"], places=3)  # contiguous: no gap, no overlap
+        self.assertAlmostEqual(blocks[-1]["end"], 50, delta=0.2)
+        for b in blocks:
+            self.assertTrue(b["file"].exists())
+            self.assertTrue(self.imports.av_check(b["file"])["ok"], b)
+
+    def test_split_reuses_finished_staging(self):
+        src = make_video(self.dir / "live.mp4", 20)
+        first = self.imports.split(src, self.dir / "staging", chunk_s=8, from_s=0, duration=20)
+        with mock.patch.object(self.imports.subprocess, "run", side_effect=AssertionError("ffmpeg ran again")):
+            self.assertEqual(self.imports.split(src, self.dir / "staging", chunk_s=8, from_s=0, duration=20), first)
+
+    def test_av_check_flags_missing_audio(self):
+        src = make_video(self.dir / "mute.mp4", 3, audio=False)
+        got = self.imports.av_check(src)
+        self.assertFalse(got["ok"])
+        self.assertEqual(got["reason"], "no audio")
+
 
 if __name__ == "__main__":
     unittest.main()

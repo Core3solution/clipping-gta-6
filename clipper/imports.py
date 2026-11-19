@@ -10,6 +10,7 @@ Being in live.yaml says what to capture, not that clips may be published: publis
 profiles/<profile>/authorizations.yaml and copied into each job's `authorization`."""
 import hashlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -51,6 +52,63 @@ def fingerprint(path):
     data.setdefault("fingerprints", {})[key] = fp
     state.save(STATE, data)
     return fp
+
+
+def av_check(path, max_start_s=0.1, max_end_s=0.5):
+    """Whether audio and video of a chunk start and end together: {ok, video: [start, end], audio: [...], reason}."""
+    spans = {}
+    for s in probe(path).get("streams") or []:
+        if s.get("codec_type") in ("video", "audio") and s["codec_type"] not in spans:
+            start = float(s.get("start_time") or 0)
+            spans[s["codec_type"]] = [round(start, 3), round(start + float(s.get("duration") or 0), 3)]
+    out = {"ok": False, "video": spans.get("video"), "audio": spans.get("audio"), "reason": ""}
+    if not spans.get("video") or not spans.get("audio"):
+        out["reason"] = "no audio" if spans.get("video") else "no video"
+        return out
+    (v0, v1), (a0, a1) = spans["video"], spans["audio"]
+    if abs(v0 - a0) > max_start_s:
+        out["reason"] = f"audio starts {a0 - v0:+.2f} s from the video"
+    elif abs(v1 - a1) > max_end_s:
+        out["reason"] = f"audio ends {a1 - v1:+.2f} s from the video"
+    else:
+        out["ok"] = True
+    return out
+
+
+def split(src, staging, chunk_s, from_s, duration):
+    """Cut `src` into chunks of `chunk_s` seconds from `from_s` (the part before it is dropped), copying the streams.
+    Returns [{file, start, end}] in seconds of the source. blocks.json in `staging` marks a finished split: a rerun
+    reuses it; a staging folder without it (a killed run) is split again from scratch."""
+    staging = Path(staging)
+    done = staging / "blocks.json"
+    if done.exists():
+        return [dict(b, file=staging / b["file"]) for b in json.loads(done.read_text(encoding="utf-8"))]
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    marks, t = ([from_s] if from_s > 0 else []), from_s + chunk_s
+    while t < duration:
+        marks.append(t)
+        t += chunk_s
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy",
+           "-f", "segment", "-segment_format", "mp4", "-segment_format_options", "movflags=+faststart",
+           "-reset_timestamps", "1", "-segment_list", str(staging / "list.csv"), "-segment_list_type", "csv"]
+    if marks:
+        cmd += ["-segment_times", ",".join(f"{m:.3f}" for m in marks)]
+    else:
+        cmd += ["-segment_time", str(chunk_s)]
+    subprocess.run(cmd + [str(staging / "b%04d.mp4")], check=True)
+    origin = float((probe(src).get("format") or {}).get("start_time") or 0)
+    blocks = []
+    for row in (staging / "list.csv").read_text(encoding="utf-8").splitlines():
+        name, a, b = row.rsplit(",", 2)
+        start, end = round(float(a) - origin, 3), round(float(b) - origin, 3)
+        if start < from_s - 0.001:  # the pre-game part before --from
+            (staging / name).unlink(missing_ok=True)
+            continue
+        blocks.append({"file": name, "start": start, "end": end})
+    done.write_text(json.dumps(blocks), encoding="utf-8")
+    return [dict(b, file=staging / b["file"]) for b in blocks]
 
 
 def authorization(streamer, profile=None):
