@@ -238,6 +238,11 @@ def main(argv=None):
         report = hooks.check_picks(picks, cfg, job_words(args.job) if args.job else None, job_words)
         for n, reused in reused_footage(picks, args.job, cfg).items():
             report.setdefault(f"video {n}", {})["footage"] = reused
+        if args.job:  # the last frames: a new shot right before the end (needs the source video)
+            for n, pick in enumerate(picks, 1):
+                late = analyze_mod.end_scene_fails(pick, config.job_dir(args.job), config.job_dir)
+                if late:
+                    report.setdefault(f"video {n}", {})["end_scene"] = late
         failing = hooks.has_fails(report)
         if report:
             print(json.dumps(report, indent=2, ensure_ascii=False))

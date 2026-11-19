@@ -1,5 +1,7 @@
 import json
+import re
 import subprocess
+from pathlib import Path
 
 import numpy as np
 
@@ -280,3 +282,37 @@ def to_markdown(r):
             lines += ["", f"### {c['id']} · {c['timestamp']} · {c['duration']:.0f}s · cue \"{c['cue']}\"",
                       f"Contact sheet: `{c['contact_sheet']}`", "", f"> {c['transcript'][:900]}"]
     return "\n".join(lines) + "\n"
+
+
+SCENE_SCORE = 0.4      # FFmpeg scene score that counts as a new shot
+END_SCENE_S = 0.6      # a new shot this close to the end means the clip's last frames show another scene
+
+
+def scene_cuts(video, start, end, score=SCENE_SCORE):
+    """Source seconds in [start, end] where the picture changes to a new shot (FFmpeg's scene score)."""
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ss", f"{max(0.0, start):.3f}", "-t",
+                          f"{max(0.0, end - start):.3f}", "-i", str(video), "-an", "-vf",
+                          f"select='gt(scene,{score})',showinfo", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    return [round(max(0.0, start) + float(t), 3) for t in re.findall(r"pts_time:([\d.]+)", out)]
+
+
+def end_scene_fails(pick, job, job_dir=None):
+    """Fails for a clip (or story-cut segment) whose last 0.6 s already show a new shot: on 18/11 the painting clip
+    ended in a garage and the plumber clip on a suggestive frame. Segments from other jobs need `job_dir(job)`."""
+    segs = pick.get("segments") or [{"start": pick.get("start"), "end": pick.get("end")}]
+    fails = []
+    for n, seg in enumerate(segs, 1):
+        d = (job_dir(seg["job"]) if job_dir else None) if seg.get("job") else job
+        try:
+            e = float(seg["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not d or not (Path(d) / "source.mp4").exists():
+            continue
+        late = [c for c in scene_cuts(Path(d) / "source.mp4", e - 1.5, e) if c >= e - END_SCENE_S]
+        if late:
+            where = f"segment {n} " if len(segs) > 1 else ""
+            fails.append(f"{where}cuts to a new shot at {late[0]:.1f}s, {e - late[0]:.1f}s before its end ({e:.1f}): "
+                         f"end before {late[0]:.1f} or check the last frame with `clipper frame`")
+    return fails

@@ -386,6 +386,25 @@ class PreRenderChecksTests(unittest.TestCase):
         self.assertIn("cut_edges", report["video 1"])
         self.assertTrue(hooks.has_fails(report))
 
+    def test_clip_ending_just_after_a_scene_change_fails(self):
+        from clipper import analyze
+        with tempfile.TemporaryDirectory() as d:
+            job = Path(d) / "job"
+            job.mkdir()
+            subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=red:s=320x180:r=30:d=5",
+                            "-f", "lavfi", "-i", "color=blue:s=320x180:r=30:d=5", "-filter_complex",
+                            "[0:v][1:v]concat=n=2:v=1[v]", "-map", "[v]", "-c:v", "libx264", "-preset", "ultrafast",
+                            str(job / "source.mp4")], check=True)
+            cuts = analyze.scene_cuts(job / "source.mp4", 3.0, 7.0)
+            self.assertEqual(len(cuts), 1)
+            self.assertAlmostEqual(cuts[0], 5.0, delta=0.05)
+            fails = analyze.end_scene_fails({"start": 1.0, "end": 5.3}, job)
+            self.assertEqual(len(fails), 1)
+            self.assertIn("5.0", fails[0])
+            self.assertEqual(analyze.end_scene_fails({"start": 1.0, "end": 4.5}, job), [])
+            seg = {"segments": [{"start": 1.0, "end": 4.5}, {"job": "other", "start": 2.0, "end": 5.2}]}
+            self.assertEqual(len(analyze.end_scene_fails(seg, job, lambda j: job)), 1)
+
     def test_render_hook_unchanged_for_a_fitting_hook(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "h.png"
