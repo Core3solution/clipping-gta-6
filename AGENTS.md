@@ -15,6 +15,7 @@ Python clipper for GTA 6 shorts (`clipper/`); see README.md for the commands and
 ## Operação GTA 6 Brasil (branch ptbr-operacao-lancamento)
 - Profile `gta-br` (`--profile gta-br` or `CLIPPER_PROFILE=gta-br`); the production command is `/clip-br` (`.claude/commands/clip-br.md`).
 - Docs for the operator are in Portuguese in `docs/pt-br/` (start at `docs/pt-br/README.md`; decisions and what is tested vs not in `docs/pt-br/DECISOES.md`).
-- New modules: `clipper/telegram.py` (delivery/approval), `clipper/vods.py` (VOD chunks), `clipper/state.py` (state/ JSON). Tests: `tests/test_ptbr.py`.
+- New modules: `clipper/telegram.py` (delivery/approval), `clipper/vods.py` (VOD chunks), `clipper/state.py` (state/ JSON), `clipper/imports.py` (`clipper import`: local MP4 → live-vod chunks). Tests: `tests/test_ptbr.py`.
+- Publishing permission is recorded apart from capture, in `profiles/<profile>/authorizations.yaml`.
 - Never publish to a social network; never commit `.env`, `jobs/`, `exports/`. Secrets only via env/.env (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).
 - Keep changes minimal and additive: English behaviour and the original profiles must stay unchanged (the full suite must stay green).

@@ -4,6 +4,7 @@ import functools
 import http.server
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -405,6 +406,86 @@ class ImportTests(unittest.TestCase):
         first = self.imports.split(src, self.dir / "staging", chunk_s=8, from_s=0, duration=20)
         with mock.patch.object(self.imports.subprocess, "run", side_effect=AssertionError("ffmpeg ran again")):
             self.assertEqual(self.imports.split(src, self.dir / "staging", chunk_s=8, from_s=0, duration=20), first)
+
+    def run_import(self, src, **kw):
+        with mock.patch.object(self.imports, "JOBS", self.dir / "jobs"):
+            return self.imports.import_file(src, "Paulinho o Loko", "https://www.youtube.com/watch?v=cxuF5siTUQw",
+                                            started_at="2026-11-18T07:35:42-03:00", vod="cxuF5siTUQw",
+                                            chunk_minutes=0.2, cfg={}, analyze=False, **kw)
+
+    def test_import_creates_jobs_and_preserves_original(self):
+        import hashlib
+        src = make_video(self.dir / "live.mp4", 30)
+        before = hashlib.sha256(src.read_bytes()).hexdigest()
+        out = self.run_import(src, from_s=5)
+        self.assertEqual(len(out["imported"]), 2)  # ~6-18, ~18-30: no keyframe after the 29 s mark
+        started = datetime.fromisoformat("2026-11-18T07:35:42-03:00").timestamp()
+        for jid in out["imported"]:
+            job = self.dir / "jobs" / jid
+            meta = json.loads((job / "job.json").read_text(encoding="utf-8"))
+            self.assertTrue((job / "source.mp4").exists() and (job / "live_ready").exists())
+            self.assertEqual(jid, f"live-vod-paulinho-o-loko-cxuF5siTUQw-{int(meta['offset']):06d}")
+            self.assertAlmostEqual(meta["recorded_at"], started + meta["offset"], places=3)
+            self.assertEqual(meta["authorization"]["status"], "pendente")
+            self.assertEqual(meta["source_sha256"], before)
+            self.assertTrue(meta["av"]["ok"])
+            self.assertEqual(meta["channel"], "Paulinho o Loko")
+        self.assertEqual(hashlib.sha256(src.read_bytes()).hexdigest(), before)  # the original is untouched
+        self.assertEqual(list((self.dir / "jobs").glob(".import-*")), [])  # staging cleaned up
+
+    def test_reimport_and_renamed_copy_are_skipped(self):
+        src = make_video(self.dir / "live.mp4", 20)
+        first = self.run_import(src)
+        copy = self.dir / "outro-nome.mp4"
+        shutil.copyfile(src, copy)
+        for again in (self.run_import(src), self.run_import(copy)):
+            self.assertTrue(again["already_imported"])
+            self.assertEqual(again["imported"], [])
+        self.assertEqual(sorted(p.name for p in (self.dir / "jobs").iterdir()), sorted(first["imported"]))
+
+    def test_resume_after_partial_move(self):
+        src = make_video(self.dir / "live.mp4", 30)
+        real, calls = os.replace, []
+
+        def flaky(a, b):  # only chunk moves fail; state.save's own os.replace goes through
+            if str(a).endswith(".mp4"):
+                calls.append(a)
+                if len(calls) == 2:
+                    raise OSError("disk hiccup")
+            return real(a, b)
+
+        with mock.patch.object(self.imports.os, "replace", side_effect=flaky):
+            with self.assertRaises(OSError):
+                self.run_import(src)
+        out = self.run_import(src)
+        jobs = sorted(p.name for p in (self.dir / "jobs").iterdir() if not p.name.startswith("."))
+        self.assertEqual(len(jobs), 3)  # 0-12, 12-24, 24-30: each once
+        self.assertEqual(len(out["imported"]) + len(out["skipped"]), 3)
+        self.assertEqual(len(out["skipped"]), 1)
+        rec = state.load("imports")[out["sha256"]]
+        self.assertTrue(rec["complete"])
+        self.assertEqual(sorted(rec["blocks"].values()), jobs)
+
+    def test_from_beyond_duration_is_an_error(self):
+        src = make_video(self.dir / "live.mp4", 6)
+        with self.assertRaises(SystemExit):
+            self.run_import(src, from_s=60)
+        self.assertEqual(list((self.dir / "jobs").glob(".import-*")), [])
+
+    def test_cli_import(self):
+        import contextlib
+        import io
+        from clipper import __main__ as cli
+        src = make_video(self.dir / "live.mp4", 10)
+        buf = io.StringIO()
+        with mock.patch.object(self.imports, "JOBS", self.dir / "jobs"), contextlib.redirect_stdout(buf), \
+                mock.patch.object(config, "PROFILE", config.PROFILE):  # main() switches the global profile
+            cli.main(["--profile", "gta-br", "import", str(src), "--streamer", "Alanzoka", "--vod", "2932200023",
+                      "--url", "https://www.twitch.tv/videos/2932200023", "--started-at", "2026-11-18T07:24:37-03:00",
+                      "--from", "2", "--chunk-minutes", "30", "--no-analyze"])
+        out = json.loads(buf.getvalue())
+        self.assertEqual(out["imported"], ["live-vod-alanzoka-2932200023-000002"])
+        self.assertIn("publicação pendente", out["warnings"][0])
 
     def test_av_check_flags_missing_audio(self):
         src = make_video(self.dir / "mute.mp4", 3, audio=False)

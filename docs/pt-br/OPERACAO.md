@@ -20,6 +20,24 @@ Logs em `logs/captura.log` e `logs/analise.log`. As duas retomam de onde pararam
 
 No `live.yaml`, `vod_from` evita baixar a parte antes do jogo, e `channel` é o nome nos créditos. Um streamer que transmite em duas plataformas entra só por uma.
 
+### Vídeo que já está no disco (importar MP4)
+
+Para uma live salva num arquivo (download do YouTube, blocos da Twitch, gravação local):
+
+```bash
+.venv/bin/python -m clipper --profile gta-br import "/caminho/live.mp4" --streamer "Paulinho o Loko" \
+  --url "https://www.youtube.com/watch?v=cxuF5siTUQw" --vod cxuF5siTUQw \
+  --started-at 2026-11-18T07:35:42-03:00 --from 1620 --no-analyze
+```
+
+- Corta em blocos de 30 min sem recodificar (`jobs/live-vod-<streamer>-<vod>-<segundo>/`), prontos para `sh scripts/operacao.sh analise` e o `/clip-br`. Sem `--no-analyze`, transcreve cada bloco logo depois de cortar.
+- `--from` pula o pré-jogo (segundos). `--started-at` é o início da live: dá o horário real de cada bloco (`recorded_at`).
+- **O original nunca é alterado.** O arquivo é reconhecido pelo SHA-256 completo: rodar de novo, ou importar uma cópia com outro nome, não cria bloco repetido. Se cair no meio, rode o mesmo comando: continua de onde parou.
+- Cada bloco tem a checagem de sincronia de áudio e vídeo em `job.json` (`av`). Problemas aparecem em `warnings` na saída.
+- Espaço: os blocos ocupam o mesmo tanto que o original (11 GB do Paulinho = +11 GB).
+- **Autorização para publicar** fica em `profiles/gta-br/authorizations.yaml`, separada do `live.yaml`. Quem não está lá sai como `pendente` no `job.json` e nos avisos.
+- Testado: suíte automática (10 testes) e um arquivo sintético de 3 min em 1080p60 pela CLI (18/11). **Ainda não testado com as gravações reais** do Paulinho e do Alanzoka.
+
 ## Armazenamento
 
 `jobs/` e `exports/` do projeto são junções para `D:\GTA6-BR\` (disco local de 673 GB; o C: tem pouco espaço). Para recriar num notebook novo, sem admin:

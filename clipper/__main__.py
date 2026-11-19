@@ -183,6 +183,17 @@ def main(argv=None):
     vd.add_argument("--dry-run", action="store_true", help="fetch: show the chunks it would download")
     vd.add_argument("--no-analyze", action="store_true",
                     help="fetch: only download (capture apart from the transcription queue: `analyze JOB` later)")
+    im = sub.add_parser("import", help="turn a local video (a saved live) into live-vod jobs of 30 min; resumable, "
+                                       "never touches the original")
+    im.add_argument("file")
+    im.add_argument("--streamer", required=True, help="name in the credits, e.g. \"Paulinho o Loko\"")
+    im.add_argument("--url", default="", help="the live's link (credit and timestamped link)")
+    im.add_argument("--started-at", help="when the live started, ISO with offset: 2026-11-18T07:35:42-03:00")
+    im.add_argument("--vod", help="id used in the job names (default: start of the file's SHA-256)")
+    im.add_argument("--title", help="the live's title (default: file name)")
+    im.add_argument("--from", dest="from_s", type=float, default=0.0, help="seconds to skip (pre-game)")
+    im.add_argument("--chunk-minutes", type=float, default=30)
+    im.add_argument("--no-analyze", action="store_true", help="only cut (the queue transcribes later)")
     args = p.parse_args(argv)
     config.load_env()
     cfg = config.load(args.config, args.profile)
@@ -359,6 +370,11 @@ def main(argv=None):
             out = vods_mod.fetch_chunks(cfg, args.max_chunks, args.dry_run, analyze=not args.no_analyze)
         else:
             out = vods_mod.status()
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+    elif args.cmd == "import":
+        from . import imports as imports_mod
+        out = imports_mod.import_file(args.file, args.streamer, args.url, args.started_at, args.vod, args.from_s,
+                                      args.chunk_minutes, cfg, analyze=not args.no_analyze, title=args.title)
         print(json.dumps(out, indent=2, ensure_ascii=False))
     elif args.cmd == "frame":
         print(analyze_mod.grid_frame(config.job_dir(args.job), args.seconds))

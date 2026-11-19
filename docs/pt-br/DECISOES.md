@@ -21,7 +21,7 @@ Atualizado em 18/11/2026 (fim do dia, notebook).
 | VOD da Kick por segmentos HLS (`vods.py`), `vod_from`, `--no-analyze` | Sim (18/11) | **Real:** 26 blocos de 30 min do Davy Jones, 1080p60 sem recodificar |
 | Primeira produção (`/clip-br` com curadoria, render, QA) | Sim (18/11) | **Real:** 10 vídeos aprovados pelo `qa-video` (27 renders). Telegram ainda não |
 | Transcrição em português (Parakeet v3) | Já existia | **Real:** 26 blocos em PT-BR; legendas conferidas pelo QA |
-| Importação de MP4 local | **Não** | Pendente (OPERACOES-2026-11-18.md) |
+| Importação de MP4 local (`clipper import`) | Sim (18/11, PC) | Testes automáticos (identidade, cortes reais, retomada, sem duplicar, A/V, autorização, CLI) e arquivo sintético de 3 min 1080p60. **Falta com as gravações reais** |
 
 A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de desenvolvimento) passa no PC (18/11, nenhum pulado) e no CI do GitHub (2 pulados lá, por falta de yt-dlp). Os testes que dependem de rede ou GPU são simulados.
 
@@ -50,6 +50,10 @@ A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de des
 18. **Três operações separadas (18/11/2026):** Davy Jones na produção (pipeline completo); Paulinho o Loko e Alanzoka só coleta, em `D:\GTA6-BR\COLETA\`, fora do `state/` e do `jobs/` do projeto. Assim, uma coleta sem autorização confirmada nunca entra na produção por engano. Resumo em [OPERACOES-2026-11-18.md](OPERACOES-2026-11-18.md).
 19. **Scripts de coleta preservados como estão (18/11/2026):** `scripts/coleta/` guarda os scripts da operação 03 (Twitch por segmentos fMP4, referências do YouTube, catálogo de clipes), só com o ffmpeg vindo do PATH. Não foram integrados ao `clipper` nem testados; a importação de MP4 local e a Twitch por segmentos no `vods.py` ficam como trabalho planejado.
 20. **Autoria dos commits do notebook (18/11/2026):** o git do notebook tem identidade pessoal. Seguindo a decisão 11, os commits deste branch são publicados como `Claude <noreply@anthropic.com>`; os 8 commits locais do dia foram reescritos com essa autoria antes do primeiro push, quando ainda não estavam em nenhum outro lugar.
+
+21. **Desenvolvimento em worktree isolada (18/11/2026, PC):** outras sessões capturam e recuperam gravações na pasta principal, usando o `.venv`, o `jobs/` e o `state/` dela. O desenvolvimento roda em `../clipping-gta-6-dev` (branch `dev/fase02`), com `.venv` próprio criado pelo mesmo `uv.lock`. Nada da pasta principal é alterado. Auditoria completa: [AUDITORIA-2026-11-18.md](AUDITORIA-2026-11-18.md).
+22. **Importar MP4 por uma passada do segment muxer (18/11/2026):** `-c copy -f segment -segment_times` com a lista CSV dá o início real de cada bloco na fonte (o corte cai no keyframe seguinte à marca). Assim os offsets e o `recorded_at` são exatos, os blocos não se sobrepõem, e a mesma entrada sempre gera os mesmos blocos, o que torna a retomada segura. Descartados: `-ss`/`-t` por bloco (sobreposição e áudio fora de sincronia no início) e recodificar (lento). Identidade pelo SHA-256 completo, guardado em cache por caminho + tamanho + mtime em `state/imports.json`.
+23. **Autorização de publicação separada da captura (18/11/2026):** estar no `live.yaml`/`creators.yaml` diz o que capturar, não o que publicar. A autorização fica em `profiles/<perfil>/authorizations.yaml` (`autorizado | pendente | negado`, evidência, data) e vai para o `job.json` de cada bloco importado. A importação nunca é bloqueada; publicar continua sendo decisão humana.
 
 ## Repositórios avaliados (resumo)
 
