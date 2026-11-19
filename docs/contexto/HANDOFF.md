@@ -4,7 +4,7 @@ Atualize ao fim de cada sessão de desenvolvimento, em poucas linhas. O hook de 
 
 ## Desenvolvimento no PC (18/11/2026, noite) — branch `dev/fase02`, worktree `../clipping-gta-6-dev`
 
-- Isolado das sessões de captura (que usam a pasta principal, o `.venv`, `jobs/` e `state/` dela). `.venv` próprio pelo mesmo `uv.lock`. **Nada mesclado nem enviado ao GitHub.**
+- Isolado das sessões de captura (que usam a pasta principal, o `.venv`, `jobs/` e `state/` dela). `.venv` próprio pelo mesmo `uv.lock`. Enviada ao GitHub em 18/11 (fim do dia), **sem mesclar**. Estado consolidado das quatro frentes, pendências e retomada: `docs/pt-br/ENCERRAMENTO-2026-11-18.md` na branch `ptbr-operacao-lancamento`.
 - [AUDITORIA-2026-11-18.md](../pt-br/AUDITORIA-2026-11-18.md): o que temos, o que usamos e o que falta (aprovada).
 - **Feito (TDD, 229 testes verdes):**
   - `clipper import`: MP4 local em blocos `live-vod-*`, retomável, SHA-256 completo, offsets reais, A/V por bloco, autorização em `profiles/gta-br/authorizations.yaml`. Revisado pelo agente `revisor`; corrigido o bug crítico de offset em fontes com `start_time` ≠ 0 (OBS/MKV).
