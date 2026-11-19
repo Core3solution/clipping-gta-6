@@ -337,5 +337,55 @@ class VodChunkTests(unittest.TestCase):
             self.assertEqual(len(out["skipped_off_topic"]), 1)
 
 
+def make_video(path, seconds, audio=True):
+    """A small H.264 (+AAC) test file with a keyframe every 2 s, like a stream recording."""
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30"]
+    if audio:
+        cmd += ["-f", "lavfi", "-i", "sine=f=440:r=48000", "-c:a", "aac"]
+    cmd += ["-t", str(seconds), "-c:v", "libx264", "-preset", "ultrafast", "-g", "60", "-keyint_min", "60",
+            "-sc_threshold", "0", str(path)]
+    subprocess.run(cmd, check=True)
+    return path
+
+
+class ImportTests(unittest.TestCase):
+    """clipper import: a local MP4 becomes live-vod jobs without touching the original."""
+
+    def setUp(self):
+        from clipper import imports
+        self.imports = imports
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        env = mock.patch.dict(os.environ, {"CLIPPER_STATE_DIR": str(self.dir / "state")})
+        env.start()
+        self.addCleanup(env.stop)
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_fingerprint_is_full_sha256_and_cached(self):
+        import hashlib
+        src = make_video(self.dir / "a.mp4", 4)
+        fp = self.imports.fingerprint(src)
+        self.assertEqual(fp["sha256"], hashlib.sha256(src.read_bytes()).hexdigest())
+        self.assertEqual(fp["size"], src.stat().st_size)
+        self.assertAlmostEqual(fp["duration"], 4.0, delta=0.2)
+        with mock.patch.object(self.imports.hashlib, "sha256", side_effect=AssertionError("re-hashed")):
+            self.assertEqual(self.imports.fingerprint(src), fp)  # same path, size and mtime: cached
+            st = src.stat()
+            os.utime(src, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+            with self.assertRaises(AssertionError):
+                self.imports.fingerprint(src)  # touched: hashed again
+
+    def test_authorization_is_separate_from_live_yaml(self):
+        prof = self.dir / "profiles" / "gta-br"
+        prof.mkdir(parents=True)
+        (prof / "authorizations.yaml").write_text(
+            'davy-jones: {status: autorizado, evidencia: "DM no Instagram", data: "2026-11-17"}\n', encoding="utf-8")
+        with mock.patch.object(config, "PROFILES", self.dir / "profiles"), \
+                mock.patch.object(live, "load_streams", side_effect=AssertionError("live.yaml read")):
+            self.assertEqual(self.imports.authorization("Davy Jones", "gta-br"),
+                             {"status": "autorizado", "evidence": "DM no Instagram", "date": "2026-11-17"})
+            self.assertEqual(self.imports.authorization("Paulinho o Loko", "gta-br")["status"], "pendente")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,8 @@
+# Autorização de publicação por streamer, registrada à parte.
+# O live.yaml e o creators.yaml só dizem o que capturar; estar neles NÃO autoriza publicar.
+# Chave: nome do streamer em minúsculas com hífens (ex.: "Paulinho o Loko" -> paulinho-o-loko).
+# status: autorizado | pendente | negado. Quem não está aqui fica "pendente".
+# evidencia: onde e como a autorização foi dada (link da mensagem, print, contrato); data: AAAA-MM-DD.
+#
+# exemplo:
+# nome-do-streamer: {status: autorizado, evidencia: "DM no Instagram, print em ...", data: "2026-11-18"}
