@@ -338,6 +338,37 @@ class VodChunkTests(unittest.TestCase):
             self.assertEqual(len(out["skipped_off_topic"]), 1)
 
 
+class PreRenderChecksTests(unittest.TestCase):
+    """Deterministic checks that used to be caught only by the QA agent after a render (18/11)."""
+
+    def test_long_hook_fails_instead_of_being_cut(self):
+        long = "Davy Jones finalmente abre o GTA 6 e não acredita no que aparece na primeira cena"
+        fails = hooks.check_hook_fit({"hooks": [long, "Ele *NÃO* esperava"], "hook_style": "bold"})
+        self.assertEqual(len(fails), 1)
+        self.assertIn(long, fails[0])
+        self.assertGreater(len(captions.hook_lines(long, "bold")), 3)
+        self.assertEqual(hooks.check_hook_fit({"hooks": ["Ele *NÃO* esperava"], "hook_style": "bold"}), [])
+
+    def test_word_wider_than_the_banner_fails(self):
+        fails = hooks.check_hook_fit({"hooks": ["SUPERCALIFRAGILISTICEXPIALIDOCIOSO"], "hook_style": "bold"})
+        self.assertEqual(len(fails), 1)
+
+    def test_check_picks_counts_hook_fit_as_fail(self):
+        report = hooks.check_picks([{"hooks": ["a " * 80], "hook_style": "box"}], {})
+        self.assertIn("hook_fit", report["video 1"])
+        self.assertTrue(hooks.has_fails(report))
+
+    def test_render_hook_unchanged_for_a_fitting_hook(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "h.png"
+            captions.render_hook("Ele *NÃO* esperava isso", p, "bold", "split")
+            from PIL import Image
+            img = Image.open(p)
+            self.assertEqual(img.size, (1080, 1920))
+            box = img.getbbox()
+            self.assertTrue(box and box[1] > 600 and box[3] < 950, box)  # centred on the split seam (768)
+
+
 def make_video(path, seconds, audio=True):
     """A small H.264 (+AAC) test file with a keyframe every 2 s, like a stream recording."""
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30"]

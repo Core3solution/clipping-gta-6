@@ -353,6 +353,21 @@ def check_music(pick, words):
             f"in the moment's mood if it adds, or set \"music\": [] to skip on purpose")
 
 
+def check_hook_fit(pick):
+    """Fails for hooks the banner would cut (more than 3 lines) or overflow (a word wider than the banner): the
+    render keeps only the first lines silently, which is how "…FINALMENTE" lost its verb on 18/11."""
+    from .captions import HOOK_MAX_LINES, hook_lines, hook_too_wide
+    style = pick.get("hook_style", "box")
+    out = []
+    for h in pick.get("hooks") or [pick.get("hook", "")]:
+        n = len(hook_lines(h, style))
+        if n > HOOK_MAX_LINES:
+            out.append(f"hook \"{h}\" takes {n} lines in the {style} banner (max {HOOK_MAX_LINES}): shorten it")
+        elif hook_too_wide(h, style):
+            out.append(f"hook \"{h}\" has a word wider than the {style} banner: shorten or split it")
+    return out
+
+
 def check_picks(picks, cfg=None, words=None, load=None):
     """{'video N': {...}} with 'fails' (fix these) and 'notes' (judgment calls) per hook/title; `edit` notes need the
     job's transcript `words` (source seconds; `load(job)` for other jobs' segments)."""
@@ -391,6 +406,8 @@ def check_picks(picks, cfg=None, words=None, load=None):
                     if pick.get(key) and pick[key] != play[key]:
                         entry.setdefault("playbook", []).append(
                             f"{key} '{pick[key]}' differs from the {kind} default '{play[key]}': keep it only on purpose")
+        if check_hook_fit(pick):
+            entry["hook_fit"] = check_hook_fit(pick)
         if check_length(pick):
             entry["length"] = check_length(pick)
         if check_labels(pick):
@@ -413,4 +430,5 @@ def check_picks(picks, cfg=None, words=None, load=None):
 
 def has_fails(report):
     return any(v.get("fails") for e in report.values() for k in ("hooks", "titles") for v in e.get(k, {}).values()) \
-        or any("variety" in e or "length" in e or "labels" in e or "footage" in e or "fx" in e for e in report.values())
+        or any(k in e for e in report.values()
+               for k in ("variety", "length", "labels", "footage", "fx", "hook_fit", "cut_edges", "end_scene"))

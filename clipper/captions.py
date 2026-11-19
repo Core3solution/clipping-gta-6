@@ -281,16 +281,42 @@ def parse_markup(text):
     return out
 
 
+HOOK_MAX_W, HOOK_MAX_LINES = 900, 3
+
+
+def _hook_layout(text, st):
+    """(markup tokens, font, wrapped lines) exactly as the banner draws them."""
+    tokens = parse_markup(text)
+    words = [w.upper() if st["upper"] else w for w, _ in tokens]
+    f = font_for(st["font"], st["size"], " ".join(words))
+    return tokens, f, _wrap(words, f, HOOK_MAX_W)
+
+
+def hook_lines(text, style="box"):
+    """The hook's banner lines, before the banner keeps only the first three (so a check can say it doesn't fit)."""
+    st = HOOK_STYLES.get(style)
+    if st is None or not text.strip():
+        return []
+    return [" ".join(w for _, w in line) for line in _hook_layout(text, st)[2]]
+
+
+def hook_too_wide(text, style="box"):
+    """Whether some banner line (a single long word) is wider than the banner."""
+    st = HOOK_STYLES.get(style)
+    if st is None or not text.strip():
+        return False
+    _, f, lines = _hook_layout(text, st)
+    return any(f.getlength(" ".join(w for _, w in line)) > HOOK_MAX_W for line in lines)
+
+
 def render_hook(text, path, style="box", layout="fit"):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     st = HOOK_STYLES.get(style)
     if st is None or not text.strip():
         img.save(path)
         return
-    tokens = parse_markup(text)
-    words = [w.upper() if st["upper"] else w for w, _ in tokens]
-    f = font_for(st["font"], st["size"], " ".join(words))
-    lines = _wrap(words, f, 900)[:3]
+    tokens, f, lines = _hook_layout(text, st)
+    lines = lines[:HOOK_MAX_LINES]
     lh = int(st["size"] * 1.2)
     centre = LAYOUTS.get(layout, LAYOUTS["fit"])["hook_y"]
     box_h = lh * len(lines) + 50
