@@ -419,12 +419,12 @@ class PreRenderChecksTests(unittest.TestCase):
 class PostRenderQaTests(unittest.TestCase):
     """clipper qa: the measurable part of the QA agent's job, by script, on the rendered MP4."""
 
-    def render_like(self, path, size="1080x1920", black=False, audio=True):
+    def render_like(self, path, size="1080x1920", black=0, audio=True):
         v = f"testsrc2=s={size}:r=30:d=4"
         cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", v]
         fc = "[0:v]null[v]"
         if black:
-            cmd += ["-f", "lavfi", "-i", f"color=black:s={size}:r=30:d=0.5", "-f", "lavfi", "-i", v]
+            cmd += ["-f", "lavfi", "-i", f"color=black:s={size}:r=30:d={black}", "-f", "lavfi", "-i", v]
             fc = "[0:v][1:v][2:v]concat=n=3:v=1[v]"
         if audio:
             cmd += ["-f", "lavfi", "-i", "sine=f=1000:r=48000:d=9"]  # 1/8 amplitude = -21 LUFS; +7 dB = -14
@@ -447,10 +447,13 @@ class PostRenderQaTests(unittest.TestCase):
         self.assertTrue(Path(got["sheet"]).exists())
         self.assertAlmostEqual(got["measures"]["lufs"], -14, delta=1.5)
 
-    def test_black_frames_fail(self):
-        got = self.qa.check(self.render_like(self.dir / "b.mp4", black=True))
+    def test_long_black_fails_but_a_short_fade_is_only_a_warning(self):
+        got = self.qa.check(self.render_like(self.dir / "b.mp4", black=1.2))
         self.assertFalse(got["ok"])
         self.assertTrue(any("black" in f for f in got["fails"]), got["fails"])
+        got = self.qa.check(self.render_like(self.dir / "f.mp4", black=0.4))  # a cutscene fade is content
+        self.assertTrue(got["ok"], got)
+        self.assertTrue(any("black" in w for w in got["warnings"]), got["warnings"])
 
     def test_no_audio_fails(self):
         got = self.qa.check(self.render_like(self.dir / "m.mp4", audio=False))

@@ -62,7 +62,9 @@ A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de des
       - início ou fim cortando uma palavra (`cut_edges`, com o segundo para onde mover);
       - troca de cena nos últimos 0,6 s (`end_scene`, pelo índice de cena do ffmpeg na fonte).
     - Fim no meio da frase é só nota (`cut_notes`).
-    - Depois do render, `clipper qa` mede o MP4 numa passada do ffmpeg: tamanho, áudio, preto ≥ 0,1 s, imagem congelada ≥ 2 s, silêncio ≥ 1,5 s, −14 ± 1,5 LUFS, pico ≤ −1 dBTP. Também grava uma folha de contato com 6 quadros.
+    - Depois do render, `clipper qa` mede o MP4 numa passada do ffmpeg e grava uma folha de contato com 6 quadros.
+      - Reprova (`fails`): tamanho diferente de 1080×1920, sem áudio, volume fora de −14 ± 1,5 LUFS, pico acima de −1 dBTP, preto ≥ 1 s.
+      - Só avisa (`warnings`), porque pode ser conteúdo: preto curto (fade de cutscene), imagem parada ≥ 2 s (tela do mapa), silêncio ≥ 1,5 s (mergulho).
     - O `qa-video` só olha essa folha, e só nos vídeos que passaram: menos renders e menos tokens.
     - Ideias do `verify_cut`/`quality_gate` do Editonny (MIT); nenhum código copiado.
 

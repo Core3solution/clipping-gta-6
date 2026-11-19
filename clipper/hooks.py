@@ -440,8 +440,9 @@ def check_picks(picks, cfg=None, words=None, load=None):
                     if pick.get(key) and pick[key] != play[key]:
                         entry.setdefault("playbook", []).append(
                             f"{key} '{pick[key]}' differs from the {kind} default '{play[key]}': keep it only on purpose")
-        if check_hook_fit(pick):
-            entry["hook_fit"] = check_hook_fit(pick)
+        fit = check_hook_fit(pick)
+        if fit:
+            entry["hook_fit"] = fit
         if words is not None and not check_segments(pick):
             edge_fails, edge_notes = check_cut_edges(pick, words, load)
             if edge_fails:

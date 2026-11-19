@@ -12,6 +12,7 @@ from pathlib import Path
 SIZE = (1080, 1920)
 LUFS, LUFS_TOL, MAX_TP = -14.0, 1.5, -1.0
 BLACK_S, FREEZE_S, SILENCE_S, SILENCE_DB = 0.1, 2.0, 1.5, -45
+BLACK_FAIL_S = 1.0  # shorter black is a cutscene fade (content): a warning for the eyes, not a re-render
 SHEET_FRAMES = 6
 
 
@@ -54,7 +55,8 @@ def contact_sheet(mp4, duration, frames=SHEET_FRAMES):
 
 
 def check(mp4):
-    """{ok, fails: [str], measures: {...}, sheet: path}: fails are what to fix before delivery."""
+    """{ok, fails, warnings, measures, sheet}. Fails are always defects (re-render). Warnings can be content (a
+    cutscene fade, a still map screen, a quiet dive): whoever looks at the contact sheet decides."""
     info = _probe(mp4)
     streams = info.get("streams") or []
     video = next((s for s in streams if s.get("codec_type") == "video"), {})
@@ -67,12 +69,14 @@ def check(mp4):
         fails.append(f"size {size[0]}x{size[1]}, expected {SIZE[0]}x{SIZE[1]}")
     if not has_audio:
         fails.append("no audio")
-    fails += [f"black {d:.2f}s at {s:.1f}s" for s, d in m["black"]]
-    fails += [f"frozen picture {d:.1f}s at {s:.1f}s" for s, d in m["freeze"]]
-    fails += [f"silence {d:.1f}s at {s:.1f}s" for s, d in m["silence"]]
+    fails += [f"black {d:.2f}s at {s:.1f}s" for s, d in m["black"] if d >= BLACK_FAIL_S]
+    warnings = [f"black {d:.2f}s at {s:.1f}s" for s, d in m["black"] if d < BLACK_FAIL_S]
+    warnings += [f"still picture {d:.1f}s at {s:.1f}s" for s, d in m["freeze"]]
+    warnings += [f"silence {d:.1f}s at {s:.1f}s" for s, d in m["silence"]]
     if has_audio and (m["lufs"] is None or abs(m["lufs"] - LUFS) > LUFS_TOL):
         fails.append(f"loudness {m['lufs']} LUFS, expected {LUFS:.0f} ± {LUFS_TOL}")
     if has_audio and m["true_peak"] is not None and m["true_peak"] > MAX_TP:
         fails.append(f"true peak {m['true_peak']} dBTP, max {MAX_TP}")
     sheet = contact_sheet(mp4, duration)
-    return {"ok": not fails, "fails": fails, "measures": dict(m, duration=round(duration, 2)), "sheet": str(sheet)}
+    return {"ok": not fails, "fails": fails, "warnings": warnings, "measures": dict(m, duration=round(duration, 2)),
+            "sheet": str(sheet)}
