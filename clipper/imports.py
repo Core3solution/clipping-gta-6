@@ -10,13 +10,16 @@ Being in live.yaml says what to capture, not that clips may be published: publis
 profiles/<profile>/authorizations.yaml and copied into each job's `authorization`."""
 import hashlib
 import json
+import os
 import shutil
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 
 from . import config, state
+from .config import JOBS
 from .live import slug
 
 STATE = "imports"
@@ -119,3 +122,76 @@ def authorization(streamer, profile=None):
     e = entries.get(slug(streamer)) or {}
     status = e.get("status") if e.get("status") in STATUSES else "pendente"
     return {"status": status, "evidence": str(e.get("evidencia") or ""), "date": str(e.get("data") or "")}
+
+
+def job_id(streamer, vod, offset):
+    return f"live-vod-{slug(streamer)}-{vod}-{int(offset):06d}"
+
+
+def import_file(path, streamer, url="", started_at=None, vod=None, from_s=0.0, chunk_minutes=30, cfg=None,
+                analyze=True, title=None):
+    """Turn a local video into live-vod jobs (one per chunk). Safe to rerun: finished imports are recognised by the
+    file's SHA-256, chunks already made are skipped, and an interrupted run continues from its staging folder."""
+    src = Path(path).resolve()
+    if not src.is_file():
+        raise SystemExit(f"arquivo não encontrado: {src}")
+    fp = fingerprint(src)
+    sha = fp["sha256"]
+    if from_s >= fp["duration"]:
+        raise SystemExit(f"--from {from_s:.0f} s passa do fim do vídeo ({fp['duration']:.0f} s)")
+    data = state.load(STATE)
+    rec = data.get(sha) or {}
+    if rec.get("complete"):
+        return {"imported": [], "skipped": sorted(rec["blocks"].values()), "warnings": [], "already_imported": True,
+                "sha256": sha}
+    vod = vod or rec.get("vod") or sha[:12]
+    rec.update(file=str(src), size=fp["size"], duration=fp["duration"], streamer=streamer, vod=vod, url=url,
+               started_at=started_at, chunk_minutes=chunk_minutes, **{"from": from_s})
+    rec.setdefault("blocks", {})
+    data[sha] = rec
+    state.save(STATE, data)
+    started = datetime.fromisoformat(started_at).timestamp() if started_at else None
+    auth = authorization(streamer, config.PROFILE)
+    warnings = []
+    if auth["status"] != "autorizado":
+        warnings.append(f"{streamer}: publicação {auth['status']} (profiles/{config.PROFILE}/authorizations.yaml)")
+    whole = av_check(src)
+    if not whole["ok"]:
+        warnings.append(f"fonte: {whole['reason']}")
+    staging = JOBS / f".import-{sha[:12]}"
+    imported, skipped = [], []
+    for b in split(src, staging, chunk_minutes * 60, from_s, fp["duration"]):
+        key, jid = f"{int(b['start']):06d}", job_id(streamer, vod, b["start"])
+        job = JOBS / jid
+        dest, meta_file = job / "source.mp4", job / "job.json"
+        if meta_file.exists() and json.loads(meta_file.read_text(encoding="utf-8")).get("source_sha256") != sha:
+            raise SystemExit(f"{jid} já existe e veio de outro arquivo; use outro --vod")
+        if rec["blocks"].get(key) == jid and dest.exists():
+            Path(b["file"]).unlink(missing_ok=True)
+            skipped.append(jid)
+            continue
+        job.mkdir(parents=True, exist_ok=True)
+        if not dest.exists():  # a run killed after the move but before saving progress already put it there
+            os.replace(b["file"], dest)
+        av = av_check(dest)
+        if not av["ok"]:
+            warnings.append(f"{jid}: {av['reason']}")
+        meta = {"id": jid, "url": url, "title": title or src.stem, "channel": streamer,
+                "duration": round(b["end"] - b["start"]), "offset": b["start"], "live": True, "vod": vod,
+                "recorded_at": started + b["start"] if started else None, "profile": config.PROFILE,
+                "source_file": str(src), "source_sha256": sha, "av": av, "authorization": auth}
+        meta_file.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        (job / "source.info.json").write_text(json.dumps({"title": meta["title"], "channel": streamer,
+                                                          "is_live": False}), encoding="utf-8")
+        (job / "live_ready").write_text(datetime.now().isoformat())
+        rec["blocks"][key] = jid
+        state.save(STATE, data)
+        imported.append(jid)
+        if analyze:
+            from .analyze import analyze as run_analysis
+            run_analysis(job, cfg)
+    rec["complete"] = True
+    state.save(STATE, data)
+    shutil.rmtree(staging, ignore_errors=True)
+    return {"imported": imported, "skipped": skipped, "warnings": warnings, "already_imported": False,
+            "sha256": sha}
