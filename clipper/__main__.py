@@ -373,6 +373,8 @@ def main(argv=None):
         print(json.dumps(out, indent=2, ensure_ascii=False))
     elif args.cmd == "import":
         from . import imports as imports_mod
+        if args.chunk_minutes < 1:
+            p.error("--chunk-minutes must be at least 1")
         out = imports_mod.import_file(args.file, args.streamer, args.url, args.started_at, args.vod, args.from_s,
                                       args.chunk_minutes, cfg, analyze=not args.no_analyze, title=args.title)
         print(json.dumps(out, indent=2, ensure_ascii=False))

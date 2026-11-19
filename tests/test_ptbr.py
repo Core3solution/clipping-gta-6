@@ -517,6 +517,81 @@ class ImportTests(unittest.TestCase):
         out = json.loads(buf.getvalue())
         self.assertEqual(out["imported"], ["live-vod-alanzoka-2932200023-000002"])
         self.assertIn("publicação pendente", out["warnings"][0])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as e, \
+                mock.patch.object(config, "PROFILE", config.PROFILE):
+            cli.main(["--profile", "gta-br", "import", str(src), "--streamer", "X", "--chunk-minutes", "0.5"])
+        self.assertEqual(e.exception.code, 2)  # rejected by the argument check, before any work
+
+    def test_source_with_nonzero_start_time_keeps_true_offsets(self):  # OBS/MKV/TS start at an arbitrary pts
+        src = self.dir / "obs.mkv"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30", "-f",
+                        "lavfi", "-i", "sine=r=48000", "-t", "30", "-c:v", "libx264", "-preset", "ultrafast", "-g",
+                        "60", "-c:a", "aac", "-output_ts_offset", "100", str(src)], check=True)
+        blocks = self.imports.split(src, self.dir / "staging", chunk_s=12, from_s=5, duration=30)
+        self.assertEqual([round(b["start"]) for b in blocks], [6, 18])
+        self.assertTrue(self.imports.av_check(src)["ok"])  # MKV: no per-stream duration, the container's is used
+
+    def test_tiny_tail_joins_the_last_chunk(self):
+        src = make_video(self.dir / "live.mp4", 26)
+        blocks = self.imports.split(src, self.dir / "staging", chunk_s=12, from_s=0, duration=26, min_tail_s=5)
+        self.assertEqual([round(b["start"]) for b in blocks], [0, 12])  # 24-26 would be a 2 s chunk
+
+    def test_no_chunks_is_an_error_not_a_finished_import(self):
+        src = make_video(self.dir / "live.mp4", 10)
+        with mock.patch.object(self.imports, "split", return_value=[]), self.assertRaises(SystemExit):
+            self.run_import(src)
+        self.assertFalse(state.load("imports").get(self.imports.fingerprint(src)["sha256"], {}).get("complete"))
+
+    def test_same_file_with_other_from_or_chunk_is_refused(self):
+        src = make_video(self.dir / "live.mp4", 20)
+        self.run_import(src, from_s=4)
+        with self.assertRaises(SystemExit) as e:
+            self.run_import(src, from_s=0)
+        self.assertIn("--from", str(e.exception))
+
+    def test_started_at_needs_a_timezone(self):
+        src = make_video(self.dir / "live.mp4", 6)
+        with mock.patch.object(self.imports, "JOBS", self.dir / "jobs"), self.assertRaises(SystemExit):
+            self.imports.import_file(src, "X", started_at="2026-11-18T07:35:42", chunk_minutes=0.2, analyze=False)
+        with mock.patch.object(self.imports, "JOBS", self.dir / "jobs"):
+            out = self.imports.import_file(src, "X", started_at="2026-11-18T10:35:42Z", chunk_minutes=0.2,
+                                           analyze=False)
+        meta = json.loads((self.dir / "jobs" / out["imported"][0] / "job.json").read_text(encoding="utf-8"))
+        self.assertAlmostEqual(meta["recorded_at"], datetime(2026, 11, 18, 10, 35, 42, tzinfo=timezone.utc)
+                               .timestamp() + meta["offset"], places=3)
+
+    def test_extra_audio_tracks_are_reported(self):
+        src = self.dir / "two.mp4"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30",
+                        "-f", "lavfi", "-i", "sine=r=48000", "-f", "lavfi", "-i", "sine=f=900:r=48000",
+                        "-map", "0", "-map", "1", "-map", "2", "-t", "6", "-c:v", "libx264", "-preset", "ultrafast",
+                        "-c:a", "aac", str(src)], check=True)
+        out = self.run_import(src)
+        self.assertTrue(any("2 trilhas de áudio" in w for w in out["warnings"]), out["warnings"])
+
+    def test_not_enough_disk_is_refused_before_cutting(self):
+        src = make_video(self.dir / "live.mp4", 6)
+        usage = shutil.disk_usage(self.dir)._replace(free=10)
+        with mock.patch.object(self.imports.shutil, "disk_usage", return_value=usage), self.assertRaises(SystemExit):
+            self.run_import(src)
+        self.assertEqual(list((self.dir / "jobs").glob(".import-*")) if (self.dir / "jobs").exists() else [], [])
+
+    def test_leftover_staging_of_a_finished_import_is_removed(self):
+        src = make_video(self.dir / "live.mp4", 6)
+        out = self.run_import(src)
+        left = self.dir / "jobs" / f".import-{out['sha256'][:12]}"
+        left.mkdir()
+        self.run_import(src)
+        self.assertFalse(left.exists())
+
+    def test_id_collision_is_found_before_any_chunk_moves(self):
+        src = make_video(self.dir / "live.mp4", 30)
+        jid = self.imports.job_id("Paulinho o Loko", "cxuF5siTUQw", 12)
+        (self.dir / "jobs" / jid).mkdir(parents=True)
+        (self.dir / "jobs" / jid / "job.json").write_text('{"source_sha256": "outro"}', encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            self.run_import(src)
+        self.assertFalse((self.dir / "jobs" / self.imports.job_id("Paulinho o Loko", "cxuF5siTUQw", 0)).exists())
 
     def test_av_check_flags_missing_audio(self):
         src = make_video(self.dir / "mute.mp4", 3, audio=False)

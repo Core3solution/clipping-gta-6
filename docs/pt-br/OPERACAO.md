@@ -34,7 +34,10 @@ Para uma live salva num arquivo (download do YouTube, blocos da Twitch, gravaç�
 - `--from` pula o pré-jogo (segundos). `--started-at` é o início da live: dá o horário real de cada bloco (`recorded_at`).
 - **O original nunca é alterado.** O arquivo é reconhecido pelo SHA-256 completo: rodar de novo, ou importar uma cópia com outro nome, não cria bloco repetido. Se cair no meio, rode o mesmo comando: continua de onde parou.
 - Cada bloco tem a checagem de sincronia de áudio e vídeo em `job.json` (`av`). Problemas aparecem em `warnings` na saída.
-- Espaço: os blocos ocupam o mesmo tanto que o original (11 GB do Paulinho = +11 GB).
+- Espaço: os blocos ocupam o mesmo tanto que o original (11 GB do Paulinho = +11 GB). Sem espaço livre, recusa antes de começar.
+- Arquivo do Windows: `C:\Users\...` vira `/mnt/c/Users/...` no WSL. Fonte com várias trilhas de áudio (OBS): só a primeira entra, com aviso.
+- `--started-at` precisa do fuso (`-03:00` ou `Z`). O mesmo arquivo não pode ser reimportado com outro `--from` ou `--chunk-minutes`: os blocos se sobreporiam.
+- Se cair durante o corte, a próxima execução refaz o corte (é cópia, leva minutos); se cair depois, continua do bloco seguinte. Se a análise de um bloco falhar, `sh scripts/operacao.sh analise` pega o bloco depois. Não rode duas importações do mesmo arquivo ao mesmo tempo.
 - **Autorização para publicar** fica em `profiles/gta-br/authorizations.yaml`, separada do `live.yaml`. Quem não está lá sai como `pendente` no `job.json` e nos avisos.
 - Testado: suíte automática (10 testes) e um arquivo sintético de 3 min em 1080p60 pela CLI (18/11). **Ainda não testado com as gravações reais** do Paulinho e do Alanzoka.
 
