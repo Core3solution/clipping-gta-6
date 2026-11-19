@@ -358,6 +358,34 @@ class PreRenderChecksTests(unittest.TestCase):
         self.assertIn("hook_fit", report["video 1"])
         self.assertTrue(hooks.has_fails(report))
 
+    WORDS = [{"w": "É", "s": 9.5, "e": 9.8}, {"w": "logo", "s": 10.0, "e": 10.5}, {"w": "de", "s": 10.6, "e": 10.7},
+             {"w": "cara.", "s": 10.8, "e": 11.2}, {"w": "Depois", "s": 11.6, "e": 12.0}]
+
+    def test_start_or_end_inside_a_word_fails(self):
+        fails, _ = hooks.check_cut_edges({"start": 10.2, "end": 11.25}, self.WORDS)
+        self.assertEqual(len(fails), 1)
+        self.assertIn("logo", fails[0])
+        fails, _ = hooks.check_cut_edges({"start": 10.0, "end": 10.3}, self.WORDS)
+        self.assertIn("ends inside", fails[0])
+
+    def test_clean_cut_passes_and_mid_sentence_end_is_a_note(self):
+        self.assertEqual(hooks.check_cut_edges({"start": 10.0, "end": 11.3}, self.WORDS), ([], []))
+        fails, notes = hooks.check_cut_edges({"start": 10.0, "end": 10.75}, self.WORDS)
+        self.assertEqual(fails, [])
+        self.assertIn("mid-sentence", notes[0])
+
+    def test_segments_from_other_jobs_use_their_own_words(self):
+        pick = {"segments": [{"start": 10.0, "end": 11.3}, {"job": "outro", "start": 10.2, "end": 11.3}]}
+        fails, _ = hooks.check_cut_edges(pick, self.WORDS, load=lambda job: self.WORDS)
+        self.assertEqual(len(fails), 1)
+        self.assertIn("segment 2", fails[0])
+        self.assertEqual(hooks.check_cut_edges(pick, self.WORDS, load=lambda job: None), ([], []))
+
+    def test_check_picks_reports_cut_edges(self):
+        report = hooks.check_picks([{"hooks": ["Ele *NÃO* esperava"], "start": 10.2, "end": 11.3}], {}, self.WORDS)
+        self.assertIn("cut_edges", report["video 1"])
+        self.assertTrue(hooks.has_fails(report))
+
     def test_render_hook_unchanged_for_a_fitting_hook(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "h.png"

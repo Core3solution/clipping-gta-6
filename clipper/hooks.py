@@ -353,6 +353,40 @@ def check_music(pick, words):
             f"in the moment's mood if it adds, or set \"music\": [] to skip on purpose")
 
 
+EDGE_TOL_S = 0.08      # a word straddling a cut by more than this is cut in half
+SENTENCE_GAP_S = 0.3   # speech resuming sooner than this after the end means the sentence goes on
+
+
+def check_cut_edges(pick, words, load=None):
+    """(fails, notes): a start or end that cuts a word in half fails (the 18/11 plumber clip began inside "Unless");
+    an end right before more of the same sentence is a note. Words are source seconds; a segment from another job
+    is checked against `load(job)`, and skipped when its words can't be had."""
+    segs = pick.get("segments") or [{"start": pick.get("start"), "end": pick.get("end")}]
+    fails, notes = [], []
+    for n, seg in enumerate(segs, 1):
+        src = (load(seg["job"]) if load else None) if seg.get("job") else words
+        try:
+            s, e = float(seg["start"]), float(seg["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not src:
+            continue
+        where = f"segment {n} " if len(segs) > 1 else ""
+        spoken = [w for w in src if not w.get("label")]
+        for cut, kind in ((s, "starts"), (e, "ends")):
+            inside = next((w for w in spoken if w["s"] < cut - EDGE_TOL_S and w["e"] > cut + EDGE_TOL_S), None)
+            if inside:
+                fails.append(f"{where}{kind} inside \"{inside['w']}\" ({inside['s']:.2f}-{inside['e']:.2f}): "
+                             f"move the cut to {inside['s' if kind == 'starts' else 'e']:.2f}")
+        last = max((w for w in spoken if s <= w["s"] and w["e"] <= e + EDGE_TOL_S), key=lambda w: w["e"], default=None)
+        nxt = min((w for w in spoken if w["s"] >= e - EDGE_TOL_S), key=lambda w: w["s"], default=None)
+        if last and nxt and not str(last["w"]).rstrip().endswith((".", "?", "!", "…")) \
+                and nxt["s"] - e < SENTENCE_GAP_S:
+            notes.append(f"{where}ends mid-sentence after \"{last['w']}\" (\"{nxt['w']}\" follows at {nxt['s']:.2f}): "
+                         f"end on the result or the reaction")
+    return fails, notes
+
+
 def check_hook_fit(pick):
     """Fails for hooks the banner would cut (more than 3 lines) or overflow (a word wider than the banner): the
     render keeps only the first lines silently, which is how "…FINALMENTE" lost its verb on 18/11."""
@@ -408,6 +442,12 @@ def check_picks(picks, cfg=None, words=None, load=None):
                             f"{key} '{pick[key]}' differs from the {kind} default '{play[key]}': keep it only on purpose")
         if check_hook_fit(pick):
             entry["hook_fit"] = check_hook_fit(pick)
+        if words is not None and not check_segments(pick):
+            edge_fails, edge_notes = check_cut_edges(pick, words, load)
+            if edge_fails:
+                entry["cut_edges"] = edge_fails
+            if edge_notes:
+                entry["cut_notes"] = edge_notes
         if check_length(pick):
             entry["length"] = check_length(pick)
         if check_labels(pick):
