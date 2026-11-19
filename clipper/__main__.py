@@ -183,7 +183,10 @@ def main(argv=None):
     vd.add_argument("--dry-run", action="store_true", help="fetch: show the chunks it would download")
     vd.add_argument("--no-analyze", action="store_true",
                     help="fetch: only download (capture apart from the transcription queue: `analyze JOB` later)")
-    im = sub.add_parser("import", help="turn a local video (a saved live) into live-vod jobs of 30 min; resumable, "
+    qa = sub.add_parser("qa", help="measure rendered MP4s (size, audio, black, frozen picture, silence, loudness) and "
+                                   "write a contact sheet per video; exit 1 if any fails")
+    qa.add_argument("files", nargs="+")
+    im = sub.add_parser("import",help="turn a local video (a saved live) into live-vod jobs of 30 min; resumable, "
                                        "never touches the original")
     im.add_argument("file")
     im.add_argument("--streamer", required=True, help="name in the credits, e.g. \"Paulinho o Loko\"")
@@ -376,6 +379,12 @@ def main(argv=None):
         else:
             out = vods_mod.status()
         print(json.dumps(out, indent=2, ensure_ascii=False))
+    elif args.cmd == "qa":
+        from . import qa as qa_mod
+        out = [dict(qa_mod.check(f), file=f) for f in args.files]
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        if not all(r["ok"] for r in out):
+            sys.exit(1)
     elif args.cmd == "import":
         from . import imports as imports_mod
         if args.chunk_minutes < 1:

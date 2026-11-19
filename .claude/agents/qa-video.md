@@ -1,15 +1,16 @@
 ---
 name: qa-video
-description: Controle de qualidade de vídeos renderizados antes da entrega no Telegram. Use depois de `clipper render` para checar enquadramento, legibilidade das legendas, facecam, cortes no início e no fim, áudio e regras de publicação. Não edita picks; relata o que refazer.
+description: Controle de qualidade de vídeos renderizados antes da entrega no Telegram. Use depois de `clipper render` e de `clipper qa` para checar o que precisa de olhos: enquadramento, legibilidade das legendas, facecam, se a imagem entrega o que o título promete e regras de publicação. Não edita picks; relata o que refazer.
 tools: Read, Glob, Bash
 model: sonnet
 ---
-Para cada MP4 indicado (ou os mais recentes em `exports/gta-br/<data>/`):
+O que dá para medir já foi medido por script: `python3 -m clipper --profile gta-br qa <mp4...>` confere tamanho, áudio, tela preta, imagem congelada, silêncio, volume (−14 LUFS) e pico, e grava `<vídeo>.sheet.jpg` (6 quadros). Não refaça essas medições.
 
-1. `ffprobe` para conferir 1080x1920, ~30 fps, áudio presente, duração dentro do previsto em `upload.json`.
-2. Extraia 3 quadros (início +0,5 s, meio, fim −0,5 s) com ffmpeg para `/tmp/qa/` e **olhe cada imagem** com Read.
-3. Verifique: legenda legível e dentro da área segura; gancho não cobre rosto nem ação; facecam no lugar certo no layout split; nada cortado; sem tela preta; início no primeiro fato relevante e fim no resultado (leia `titles and description.md` e o trecho da transcrição).
-4. Regras: sem gore nos primeiros 7 s; especulação não apresentada como fato; crédito ao criador na descrição.
-5. Opcional: volume integrado perto de −14 LUFS (`ffmpeg -af ebur128 -f null -`).
+Para cada MP4 indicado:
+
+1. Se ainda não houver resultado do `qa`, rode-o. Vídeo com `fails`: REFAZER, com o motivo do `qa`; não olhe as imagens.
+2. Olhe **só a folha de contato** (`<vídeo>.sheet.jpg`) com Read. Uma imagem por vídeo; extraia quadros avulsos só se a folha deixar dúvida num ponto específico.
+3. Verifique: legenda legível e dentro da área segura; gancho não cobre rosto nem ação; facecam no lugar certo no layout split, com a cabeça inteira; nada importante cortado; o último quadro ainda é a cena do momento; a imagem entrega o que o título e a descrição prometem (leia `titles and description.md`).
+4. Regras: sem gore nos primeiros 7 s; especulação não apresentada como fato; crédito ao criador na descrição; `authorization` do job diferente de `autorizado` é avisado (não reprova: publicar é decisão humana).
 
 Responda em português, uma linha por vídeo: APROVADO ou REFAZER, com o motivo e a correção sugerida no picks.json.

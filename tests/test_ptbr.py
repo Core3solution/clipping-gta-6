@@ -416,6 +416,64 @@ class PreRenderChecksTests(unittest.TestCase):
             self.assertTrue(box and box[1] > 600 and box[3] < 950, box)  # centred on the split seam (768)
 
 
+class PostRenderQaTests(unittest.TestCase):
+    """clipper qa: the measurable part of the QA agent's job, by script, on the rendered MP4."""
+
+    def render_like(self, path, size="1080x1920", black=False, audio=True):
+        v = f"testsrc2=s={size}:r=30:d=4"
+        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", v]
+        fc = "[0:v]null[v]"
+        if black:
+            cmd += ["-f", "lavfi", "-i", f"color=black:s={size}:r=30:d=0.5", "-f", "lavfi", "-i", v]
+            fc = "[0:v][1:v][2:v]concat=n=3:v=1[v]"
+        if audio:
+            cmd += ["-f", "lavfi", "-i", "sine=f=1000:r=48000:d=9"]  # 1/8 amplitude = -21 LUFS; +7 dB = -14
+        cmd += ["-filter_complex", fc + (f";[{3 if black else 1}:a]volume=7dB[a]" if audio else ""),
+                "-map", "[v]"] + (["-map", "[a]", "-c:a", "aac", "-shortest"] if audio else []) + \
+               ["-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(path)]
+        subprocess.run(cmd, check=True)
+        return path
+
+    def setUp(self):
+        from clipper import qa
+        self.qa = qa
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+
+    def test_clean_render_passes_and_gets_a_contact_sheet(self):
+        got = self.qa.check(self.render_like(self.dir / "video 1.mp4"))
+        self.assertTrue(got["ok"], got)
+        self.assertTrue(Path(got["sheet"]).exists())
+        self.assertAlmostEqual(got["measures"]["lufs"], -14, delta=1.5)
+
+    def test_black_frames_fail(self):
+        got = self.qa.check(self.render_like(self.dir / "b.mp4", black=True))
+        self.assertFalse(got["ok"])
+        self.assertTrue(any("black" in f for f in got["fails"]), got["fails"])
+
+    def test_no_audio_fails(self):
+        got = self.qa.check(self.render_like(self.dir / "m.mp4", audio=False))
+        self.assertIn("no audio", got["fails"])
+
+    def test_cli_qa_exits_1_when_any_video_fails(self):
+        import contextlib
+        import io
+        from clipper import __main__ as cli
+        good, bad = self.render_like(self.dir / "g.mp4"), self.render_like(self.dir / "m.mp4", audio=False)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), self.assertRaises(SystemExit) as e, \
+                mock.patch.object(config, "PROFILE", config.PROFILE):
+            cli.main(["--profile", "gta-br", "qa", str(good), str(bad)])
+        self.assertEqual(e.exception.code, 1)
+        out = json.loads(buf.getvalue())
+        self.assertEqual([r["ok"] for r in out], [True, False])
+
+    def test_wrong_size_fails(self):
+        got = self.qa.check(self.render_like(self.dir / "s.mp4", size="720x1280"))
+        self.assertTrue(any("720x1280" in f for f in got["fails"]), got["fails"])
+
+
 def make_video(path, seconds, audio=True):
     """A small H.264 (+AAC) test file with a keyframe every 2 s, like a stream recording."""
     cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30"]

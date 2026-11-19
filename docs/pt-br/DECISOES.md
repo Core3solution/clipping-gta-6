@@ -21,6 +21,7 @@ Atualizado em 18/11/2026 (fim do dia, notebook).
 | VOD da Kick por segmentos HLS (`vods.py`), `vod_from`, `--no-analyze` | Sim (18/11) | **Real:** 26 blocos de 30 min do Davy Jones, 1080p60 sem recodificar |
 | Primeira produção (`/clip-br` com curadoria, render, QA) | Sim (18/11) | **Real:** 10 vídeos aprovados pelo `qa-video` (27 renders). Telegram ainda não |
 | Transcrição em português (Parakeet v3) | Já existia | **Real:** 26 blocos em PT-BR; legendas conferidas pelo QA |
+| Checagens antes do render (`hook_fit`, `cut_edges`, `end_scene`) e `clipper qa` depois | Sim (18/11, PC) | Testes automáticos com vídeos sintéticos; `qa` validado num render real do nosso pipeline (passou, −14,0 LUFS). **Falta numa produção real** |
 | Importação de MP4 local (`clipper import`) | Sim (18/11, PC) | Testes automáticos (identidade, cortes reais, retomada, sem duplicar, A/V, autorização, CLI) e arquivo sintético de 3 min 1080p60. **Falta com as gravações reais** |
 
 A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de desenvolvimento) passa no PC (18/11, nenhum pulado) e no CI do GitHub (2 pulados lá, por falta de yt-dlp). Os testes que dependem de rede ou GPU são simulados.
@@ -54,6 +55,16 @@ A suíte completa (187 testes: 158 originais, 21 do PT-BR, 8 da estrutura de des
 21. **Desenvolvimento em worktree isolada (18/11/2026, PC):** outras sessões capturam e recuperam gravações na pasta principal, usando o `.venv`, o `jobs/` e o `state/` dela. O desenvolvimento roda em `../clipping-gta-6-dev` (branch `dev/fase02`), com `.venv` próprio criado pelo mesmo `uv.lock`. Nada da pasta principal é alterado. Auditoria completa: [AUDITORIA-2026-11-18.md](AUDITORIA-2026-11-18.md).
 22. **Importar MP4 por uma passada do segment muxer (18/11/2026):** `-c copy -f segment -segment_times` com a lista CSV dá o início real de cada bloco na fonte (o corte cai no keyframe seguinte à marca). Assim os offsets e o `recorded_at` são exatos, os blocos não se sobrepõem, e a mesma entrada sempre gera os mesmos blocos, o que torna a retomada segura. Descartados: `-ss`/`-t` por bloco (sobreposição e áudio fora de sincronia no início) e recodificar (lento). Identidade pelo SHA-256 completo, guardado em cache por caminho + tamanho + mtime em `state/imports.json`.
 23. **Autorização de publicação separada da captura (18/11/2026):** estar no `live.yaml`/`creators.yaml` diz o que capturar, não o que publicar. A autorização fica em `profiles/<perfil>/authorizations.yaml` (`autorizado | pendente | negado`, evidência, data) e vai para o `job.json` de cada bloco importado. A importação nunca é bloqueada; publicar continua sendo decisão humana.
+
+24. **Checagens determinísticas antes e depois do render (18/11/2026):** o que o `qa-video` pegou depois de 27 renders virou script.
+    - Antes do render, o `clipper check` reprova:
+      - gancho que o banner cortaria ou estouraria (`hook_fit`; antes o render mantinha só 3 linhas, em silêncio);
+      - início ou fim cortando uma palavra (`cut_edges`, com o segundo para onde mover);
+      - troca de cena nos últimos 0,6 s (`end_scene`, pelo índice de cena do ffmpeg na fonte).
+    - Fim no meio da frase é só nota (`cut_notes`).
+    - Depois do render, `clipper qa` mede o MP4 numa passada do ffmpeg: tamanho, áudio, preto ≥ 0,1 s, imagem congelada ≥ 2 s, silêncio ≥ 1,5 s, −14 ± 1,5 LUFS, pico ≤ −1 dBTP. Também grava uma folha de contato com 6 quadros.
+    - O `qa-video` só olha essa folha, e só nos vídeos que passaram: menos renders e menos tokens.
+    - Ideias do `verify_cut`/`quality_gate` do Editonny (MIT); nenhum código copiado.
 
 ## Repositórios avaliados (resumo)
 
