@@ -31,7 +31,7 @@ Com `CLIPPER_PROFILE=gta-br` no `.env`, o `--profile gta-br` pode ser omitido.
 - `profiles/gta-br/`: perfil (palavras de empolgação em PT-BR, censura, encoder, VODs, exemplos de ganchos), `creators.yaml` (canais de upload; o canal oficial da Rockstar já está lá) e `live.yaml` (streamers da Twitch para lives e VODs).
 - `.claude/commands/clip-br.md`: o roteiro que o Claude segue no `/clip-br` (curadoria, dois modelos de edição, textos em PT-BR, entrega).
 - `state/`: progresso que precisa sobreviver entre execuções (VODs, Telegram). Pequeno, em JSON.
-- `docs/pt-br/`: este guia, mais [OPERACOES-2026-11-18.md](OPERACOES-2026-11-18.md) (o primeiro dia de produção), [OPERACAO.md](OPERACAO.md) (filas e armazenamento), [anatomia-do-corte.html](anatomia-do-corte.html) (como um vídeo é feito), [WINDOWS-WSL.md](WINDOWS-WSL.md), [TELEGRAM.md](TELEGRAM.md), [NUVEM.md](NUVEM.md), [DECISOES.md](DECISOES.md), [DESENVOLVIMENTO.md](DESENVOLVIMENTO.md) e [ECOSSISTEMA.md](ECOSSISTEMA.md).
+- `docs/pt-br/`: este guia, mais [ENCERRAMENTO-2026-11-18.md](ENCERRAMENTO-2026-11-18.md) (estado oficial, auditoria, pendências e retomada), [OPERACOES-2026-11-18.md](OPERACOES-2026-11-18.md) (o primeiro dia de produção), [OPERACAO.md](OPERACAO.md) (filas e armazenamento), [anatomia-do-corte.html](anatomia-do-corte.html) (como um vídeo é feito), [WINDOWS-WSL.md](WINDOWS-WSL.md), [TELEGRAM.md](TELEGRAM.md), [NUVEM.md](NUVEM.md), [DECISOES.md](DECISOES.md), [DESENVOLVIMENTO.md](DESENVOLVIMENTO.md) e [ECOSSISTEMA.md](ECOSSISTEMA.md).
 
 ## Cadastrar streamers (só os autorizados)
 
